@@ -1,5 +1,6 @@
 import logging
 import spotipy
+from spotipy.cache_handler import CacheFileHandler
 from spotipy.oauth2 import SpotifyClientCredentials
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
@@ -12,9 +13,11 @@ logger = logging.getLogger(__name__)
 class SpotifyService:
     def __init__(self):
         settings = get_settings()
+        cache_handler = CacheFileHandler(cache_path="/tmp/spotipy.cache")
         auth_manager = SpotifyClientCredentials(
             client_id=settings.spotify_client_id,
-            client_secret=settings.spotify_client_secret
+            client_secret=settings.spotify_client_secret,
+            cache_handler=cache_handler,
         )
         self.client = spotipy.Spotify(auth_manager=auth_manager)
 

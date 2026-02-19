@@ -50,7 +50,7 @@ services:
     cpus: "1.00"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8619/health', timeout=3)"]
+      test: ["CMD-SHELL", "python -c 'import urllib.request as u; u.urlopen(\"http://127.0.0.1:8619/health\", timeout=3)' || exit 1"]
       interval: 20s
       timeout: 5s
       retries: 5
