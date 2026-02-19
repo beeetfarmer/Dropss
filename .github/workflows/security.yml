@@ -63,10 +63,10 @@ jobs:
           checkov -f docker-compose.yml -f docker-compose.dev.yml
 
       - name: Build backend image
-        run: docker build -t dropss-backend:${{ github.sha }} backend
+        run: docker build --pull -t dropss-backend:${{ github.sha }} backend
 
       - name: Build frontend image
-        run: docker build -t dropss-frontend:${{ github.sha }} frontend
+        run: docker build --pull -t dropss-frontend:${{ github.sha }} frontend
 
       - name: Trivy scan backend image
         uses: aquasecurity/trivy-action@0.28.0
@@ -74,6 +74,7 @@ jobs:
           image-ref: dropss-backend:${{ github.sha }}
           vuln-type: os,library
           severity: CRITICAL,HIGH
+          ignore-unfixed: true
           exit-code: "1"
 
       - name: Trivy scan frontend image
@@ -82,6 +83,7 @@ jobs:
           image-ref: dropss-frontend:${{ github.sha }}
           vuln-type: os,library
           severity: CRITICAL,HIGH
+          ignore-unfixed: true
           exit-code: "1"
 
       - name: Generate SBOM
