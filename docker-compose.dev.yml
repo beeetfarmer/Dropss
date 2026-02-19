@@ -26,7 +26,7 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-development}
       EXPOSE_DOCS: ${EXPOSE_DOCS:-true}
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://dropss:dropss@db:5432/dropss}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       SETTINGS_OVERRIDES_FILE: ${SETTINGS_OVERRIDES_FILE:-/data/settings_overrides.json}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8093,http://localhost:3000}
       AUTH_ENABLED: ${AUTH_ENABLED:-false}
