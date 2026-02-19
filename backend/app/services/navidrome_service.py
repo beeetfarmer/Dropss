@@ -21,6 +21,7 @@ class NavidromeService:
 
     def _auth_params(self) -> Dict[str, str]:
         salt = secrets.token_hex(8)
+        # nosem: Navidrome/Subsonic protocol requires MD5(password + salt)
         token = hashlib.md5((self.password + salt).encode()).hexdigest()
         return {
             "u": self.username,
