@@ -1,0 +1,73 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
+misc/
+.cache
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Runtime settings (written by the web UI)
+settings_overrides.json
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.claude/
+
+# Node.js / React
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp/
+.pnp.js
+frontend/.vite/
+frontend/.eslintcache
+frontend/build/
+frontend/dist/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# Python test/type/lint artifacts
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.ruff_cache/
+backend/.tox/
+backend/.nox/
+backend/.coverage
+backend/coverage.xml
+backend/htmlcov/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+#misc
+misc/
+screenshots/
+screenshots-new/
+docs/
+README.md
+helper scripts/
