@@ -1,0 +1,132 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 16% 8%;
+    --foreground: 210 20% 92%;
+
+    --card: 220 14% 11%;
+    --card-foreground: 210 20% 92%;
+
+    --popover: 220 14% 11%;
+    --popover-foreground: 210 20% 92%;
+
+    --primary: 160 84% 39%;
+    --primary-foreground: 220 16% 8%;
+
+    --secondary: 220 14% 16%;
+    --secondary-foreground: 210 20% 85%;
+
+    --muted: 220 12% 14%;
+    --muted-foreground: 215 12% 50%;
+
+    --accent: 220 14% 18%;
+    --accent-foreground: 210 20% 92%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 220 12% 18%;
+    --input: 220 12% 18%;
+    --ring: 160 84% 39%;
+
+    --radius: 0.75rem;
+
+    --badge-album: 270 70% 60%;
+    --badge-ep: 160 84% 39%;
+    --badge-single: 210 80% 55%;
+    --badge-new: 45 93% 58%;
+
+    --status-available: 160 84% 39%;
+    --status-partial: 45 93% 58%;
+    --status-missing: 0 72% 51%;
+
+    --glass: 220 14% 12%;
+    --glass-border: 220 12% 22%;
+
+    --sidebar-background: 220 14% 11%;
+    --sidebar-foreground: 210 20% 92%;
+    --sidebar-primary: 160 84% 39%;
+    --sidebar-primary-foreground: 220 16% 8%;
+    --sidebar-accent: 220 14% 18%;
+    --sidebar-accent-foreground: 210 20% 92%;
+    --sidebar-border: 220 12% 18%;
+    --sidebar-ring: 160 84% 39%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  code, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-xl border border-glass-border rounded-xl;
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5;
+  }
+
+  .badge-album {
+    @apply bg-badge-album/15 text-badge-album border border-badge-album/25;
+  }
+
+  .badge-ep {
+    @apply bg-badge-ep/15 text-badge-ep border border-badge-ep/25;
+  }
+
+  .badge-single {
+    @apply bg-badge-single/15 text-badge-single border border-badge-single/25;
+  }
+
+  .badge-new {
+    @apply bg-badge-new/15 text-badge-new border border-badge-new/30 font-semibold;
+  }
+
+  .status-dot {
+    @apply w-2.5 h-2.5 rounded-full;
+  }
+
+  .status-available {
+    @apply bg-status-available shadow-sm shadow-status-available/50;
+  }
+
+  .status-partial {
+    @apply bg-status-partial shadow-sm shadow-status-partial/50;
+  }
+
+  .status-missing {
+    @apply bg-status-missing shadow-sm shadow-status-missing/50;
+  }
+
+  .glow-primary {
+    box-shadow: 0 0 30px -5px hsl(var(--primary) / 0.15);
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-badge-single;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted)) transparent;
+  }
+}
