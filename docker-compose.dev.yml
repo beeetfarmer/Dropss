@@ -1,0 +1,67 @@
+name: dropss-dev
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dropss}
+      POSTGRES_USER: ${POSTGRES_USER:-dropss}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dropss}
+    volumes:
+      - dropss_postgres_dev:/var/lib/postgresql/data
+    ports:
+      - "${DEV_DB_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dropss} -d ${POSTGRES_DB:-dropss}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .env
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      EXPOSE_DOCS: ${EXPOSE_DOCS:-true}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://dropss:dropss@db:5432/dropss}
+      SETTINGS_OVERRIDES_FILE: ${SETTINGS_OVERRIDES_FILE:-/data/settings_overrides.json}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8093,http://localhost:3000}
+      AUTH_ENABLED: ${AUTH_ENABLED:-false}
+      APP_PASSWORD: ${APP_PASSWORD:-devpassword}
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-dev_secret_change_me}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      OUTBOUND_ALLOWLIST: ${OUTBOUND_ALLOWLIST:-localhost,backend,db,127.0.0.1}
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - dropss_settings_dev:/data
+    ports:
+      - "${DEV_BACKEND_PORT:-8620}:8619"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    environment:
+      VITE_PROXY_TARGET: ${VITE_PROXY_TARGET:-http://backend:8619}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - dropss_frontend_node_modules:/app/node_modules
+    ports:
+      - "${DEV_FRONTEND_PORT:-8093}:8080"
+    restart: unless-stopped
+
+volumes:
+  dropss_postgres_dev:
+  dropss_settings_dev:
+  dropss_frontend_node_modules:

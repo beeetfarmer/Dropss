@@ -1,0 +1,85 @@
+name: dropss-prod
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dropss}
+      POSTGRES_USER: ${POSTGRES_USER:-dropss}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - dropss_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dropss} -d ${POSTGRES_DB:-dropss}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: ${BACKEND_IMAGE:-beeetfarmer/dropss-backend:latest}
+    env_file:
+      - .env
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      EXPOSE_DOCS: ${EXPOSE_DOCS:-false}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      SETTINGS_OVERRIDES_FILE: ${SETTINGS_OVERRIDES_FILE:-/data/settings_overrides.json}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      AUTH_ENABLED: "true"
+      APP_PASSWORD: ${APP_PASSWORD:-}
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      OUTBOUND_ALLOWLIST: ${OUTBOUND_ALLOWLIST:-}
+      LOG_LEVEL: ${LOG_LEVEL:-WARNING}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - dropss_settings:/data
+    expose:
+      - "8619"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 512m
+    cpus: "1.00"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8619/health', timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-beeetfarmer/dropss-frontend:latest}
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 256m
+    cpus: "0.50"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000 >/dev/null 2>&1 || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  dropss_postgres:
+  dropss_settings:
