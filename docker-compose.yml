@@ -8,6 +8,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-dropss}
       POSTGRES_USER: ${POSTGRES_USER:-dropss}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    mem_limit: 1024m
     volumes:
       - dropss_postgres:/var/lib/postgresql/data
     healthcheck:
@@ -66,7 +67,6 @@ services:
     tmpfs:
       - /tmp
       - /var/cache/nginx
-      - /var/run
     security_opt:
       - no-new-privileges:true
     cap_drop:
