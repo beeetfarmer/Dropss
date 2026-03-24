@@ -69,7 +69,7 @@ jobs:
         run: docker build --pull -t dropss-frontend:${{ github.sha }} frontend
 
       - name: Trivy scan backend image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: dropss-backend:${{ github.sha }}
           vuln-type: os,library
@@ -78,7 +78,7 @@ jobs:
           exit-code: "1"
 
       - name: Trivy scan frontend image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: dropss-frontend:${{ github.sha }}
           vuln-type: os,library
