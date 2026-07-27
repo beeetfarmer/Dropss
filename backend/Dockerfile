@@ -18,6 +18,14 @@ COPY docker-entrypoint.sh .
 
 RUN chmod +x /app/docker-entrypoint.sh && chown -R app:app /app
 
+# SETTINGS_OVERRIDES_FILE lives here and is backed by a named volume. Docker
+# seeds an empty volume with the ownership of this directory, so creating it
+# as app:app is what lets the unprivileged runtime user write settings. Without
+# it the mount point is created root-owned and saving settings fails with
+# EACCES. Pre-existing volumes keep their old ownership and need a one-off
+# chown to 100:101.
+RUN mkdir -p /data && chown app:app /data
+
 USER app
 
 EXPOSE 8619
