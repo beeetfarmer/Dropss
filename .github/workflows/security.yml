@@ -5,10 +5,17 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
+
+env:
+  DOCKERHUB_NAMESPACE: beeetfarmer
 
 jobs:
   scans:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -35,7 +42,7 @@ jobs:
         working-directory: frontend
         run: |
           npm ci
-          npm audit --audit-level=moderate
+          node scripts/audit-check.mjs
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -69,7 +76,7 @@ jobs:
         run: docker build --pull -t dropss-frontend:${{ github.sha }} frontend
 
       - name: Trivy scan backend image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: dropss-backend:${{ github.sha }}
           vuln-type: os,library
@@ -78,7 +85,7 @@ jobs:
           exit-code: "1"
 
       - name: Trivy scan frontend image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: dropss-frontend:${{ github.sha }}
           vuln-type: os,library
@@ -98,3 +105,39 @@ jobs:
         with:
           name: dropss-sbom
           path: dropss-sbom.cdx.json
+
+      # Publishing runs last, in this same job, so the images pushed are the
+      # exact ones Trivy scanned above rather than a rebuild. Pull requests
+      # still build and scan, but never publish.
+      - name: Log in to Docker Hub
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Publish images to Docker Hub
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        shell: bash
+        run: |
+          set -euo pipefail
+          # sha- is always published and is the rollback target. A push to main
+          # moves latest; a v* tag publishes the release version. Tagging is
+          # what mints a version, so a version tag can never be overwritten by
+          # an ordinary merge.
+          tags=("sha-${GITHUB_SHA:0:7}")
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            tags+=("latest")
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tags+=("${GITHUB_REF#refs/tags/v}")
+          fi
+
+          for svc in backend frontend; do
+            built="dropss-${svc}:${GITHUB_SHA}"
+            repo="${DOCKERHUB_NAMESPACE}/dropss-${svc}"
+            for tag in "${tags[@]}"; do
+              docker tag "$built" "${repo}:${tag}"
+              docker push "${repo}:${tag}"
+              echo "published ${repo}:${tag}"
+            done
+          done
