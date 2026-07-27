@@ -79,11 +79,21 @@ class TelegramService:
         except requests.exceptions.RequestException as e:
             # Telegram returns the real reason in the body; surface it, since
             # "chat not found" and "unauthorized" are the usual setup mistakes.
+            # requests embeds the request URL in the exception text, and the
+            # token is part of that URL, so both parts must be redacted before
+            # they reach the log.
             detail = ""
             if e.response is not None:
                 detail = e.response.text[:200]
-            logger.warning("Error sending Telegram notification: %s %s", e, detail)
+            logger.warning(
+                "Error sending Telegram notification: %s %s",
+                self._redact(str(e)),
+                self._redact(detail),
+            )
             return False
+
+    def _redact(self, text: str) -> str:
+        return text.replace(self.bot_token, "<redacted>") if self.bot_token else text
 
     @staticmethod
     def _format_release_message(releases: list) -> str:
