@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     ntfy_username: str = ""
     ntfy_password: str = ""
 
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+
     database_url: str = "postgresql+psycopg://dropss:dropss@localhost:5424/dropss"
 
     lastfm_api_key: str = ""
@@ -54,6 +57,7 @@ class Settings(BaseSettings):
 
 SECRET_FIELDS = {
     "spotify_client_secret", "gotify_token", "ntfy_password",
+    "telegram_bot_token",
     "lastfm_api_key", "jellyfin_api_key", "plex_token",
     "navidrome_password",
 }
@@ -62,6 +66,7 @@ OVERRIDABLE_FIELDS = {
     "spotify_client_id", "spotify_client_secret",
     "gotify_url", "gotify_token",
     "ntfy_url", "ntfy_topic", "ntfy_username", "ntfy_password",
+    "telegram_bot_token", "telegram_chat_id",
     "lastfm_api_key", "lastfm_username",
     "jellyfin_url", "jellyfin_api_key",
     "plex_url", "plex_token",

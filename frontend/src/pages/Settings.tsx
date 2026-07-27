@@ -102,6 +102,17 @@ const sections: SectionConfig[] = [
     testLabel: "Send Test Notification",
   },
   {
+    title: "Telegram",
+    icon: <Bell className="h-5 w-5 text-sky-400" />,
+    description: "Push notifications via a Telegram bot",
+    fields: [
+      { key: "telegram_bot_token", label: "Bot Token", placeholder: "Set via environment", type: "password", envOnly: true },
+      { key: "telegram_chat_id", label: "Chat ID", placeholder: "e.g. 123456789" },
+    ],
+    testAction: () => integrationAPI.testTelegram(),
+    testLabel: "Send Test Notification",
+  },
+  {
     title: "Application",
     icon: <Clock className="h-5 w-5 text-primary" />,
     description: "General application settings",

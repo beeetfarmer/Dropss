@@ -9,6 +9,7 @@ from .models import Artist, Release
 from .services.spotify_service import SpotifyService
 from .services.gotify_service import GotifyService
 from .services.ntfy_service import NtfyService
+from .services.telegram_service import TelegramService
 from .config import get_settings
 
 scheduler = BackgroundScheduler()
@@ -33,10 +34,13 @@ async def check_for_new_releases():
 
         gotify = None
         ntfy = None
+        telegram = None
         if current_settings.gotify_url and current_settings.gotify_token:
             gotify = GotifyService()
         if current_settings.ntfy_url and current_settings.ntfy_topic:
             ntfy = NtfyService()
+        if current_settings.telegram_bot_token and current_settings.telegram_chat_id:
+            telegram = TelegramService()
 
         total_new = 0
 
@@ -88,6 +92,11 @@ async def check_for_new_releases():
                         )
                     if ntfy:
                         await ntfy.send_release_notification(
+                            artist.name,
+                            new_releases
+                        )
+                    if telegram:
+                        await telegram.send_release_notification(
                             artist.name,
                             new_releases
                         )

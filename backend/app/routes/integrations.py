@@ -16,6 +16,7 @@ from ..services.navidrome_service import NavidromeService
 from ..services.spotify_service import SpotifyService, SpotifyServiceError
 from ..services.gotify_service import GotifyService
 from ..services.ntfy_service import NtfyService
+from ..services.telegram_service import TelegramService
 from ..config import get_settings
 from ..rate_limit import rate_limit
 from ..security import get_rate_limit_identity, require_authenticated_request, require_write_request
@@ -75,6 +76,8 @@ async def check_integration_status(_: None = Depends(rate_limit(max_requests=30,
 
     ntfy_configured = bool(settings.ntfy_url and settings.ntfy_topic)
 
+    telegram_configured = bool(settings.telegram_bot_token and settings.telegram_chat_id)
+
     spotify_configured = bool(settings.spotify_client_id and settings.spotify_client_secret)
 
     lastfm_configured = bool(settings.lastfm_api_key and settings.lastfm_username)
@@ -85,6 +88,7 @@ async def check_integration_status(_: None = Depends(rate_limit(max_requests=30,
         "navidrome_available": navidrome_available,
         "gotify_configured": gotify_configured,
         "ntfy_configured": ntfy_configured,
+        "telegram_configured": telegram_configured,
         "spotify_configured": spotify_configured,
         "lastfm_configured": lastfm_configured,
         "errors": errors
@@ -161,6 +165,42 @@ async def test_ntfy_connection(
 
     except Exception:
         raise HTTPException(status_code=500, detail="Ntfy test failed")
+
+
+@router.post("/telegram/test")
+async def test_telegram_connection(
+    request: Request,
+    __: None = Depends(require_write_request),
+    _: None = Depends(rate_limit(max_requests=5, window_seconds=60)),
+):
+    settings = get_settings()
+
+    if not settings.telegram_bot_token or not settings.telegram_chat_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Telegram is not configured. Please set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID."
+        )
+
+    try:
+        identity = get_rate_limit_identity(request)
+        record_anomaly_event(
+            category="notification_test_calls",
+            key=identity,
+            threshold=8,
+            window_seconds=600,
+            logger=logger,
+            details={"endpoint": "/integrations/telegram/test"},
+        )
+        telegram = TelegramService()
+        success = await telegram.test_connection()
+
+        if success:
+            return {"success": True, "message": "Telegram test notification sent successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to send Telegram notification")
+
+    except Exception:
+        raise HTTPException(status_code=500, detail="Telegram test failed")
 
 
 class LastFmImportRequest(BaseModel):
