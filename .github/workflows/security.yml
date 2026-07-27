@@ -5,10 +5,17 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
+
+env:
+  DOCKERHUB_NAMESPACE: beeetfarmer
 
 jobs:
   scans:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -98,3 +105,39 @@ jobs:
         with:
           name: dropss-sbom
           path: dropss-sbom.cdx.json
+
+      # Publishing runs last, in this same job, so the images pushed are the
+      # exact ones Trivy scanned above rather than a rebuild. Pull requests
+      # still build and scan, but never publish.
+      - name: Log in to Docker Hub
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Publish images to Docker Hub
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        shell: bash
+        run: |
+          set -euo pipefail
+          # sha- is always published and is the rollback target. A push to main
+          # moves latest; a v* tag publishes the release version. Tagging is
+          # what mints a version, so a version tag can never be overwritten by
+          # an ordinary merge.
+          tags=("sha-${GITHUB_SHA:0:7}")
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            tags+=("latest")
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tags+=("${GITHUB_REF#refs/tags/v}")
+          fi
+
+          for svc in backend frontend; do
+            built="dropss-${svc}:${GITHUB_SHA}"
+            repo="${DOCKERHUB_NAMESPACE}/dropss-${svc}"
+            for tag in "${tags[@]}"; do
+              docker tag "$built" "${repo}:${tag}"
+              docker push "${repo}:${tag}"
+              echo "published ${repo}:${tag}"
+            done
+          done
