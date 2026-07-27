@@ -1,13 +1,43 @@
 import logging
 import spotipy
 from spotipy.cache_handler import CacheFileHandler
-from spotipy.oauth2 import SpotifyClientCredentials
+from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOauthError
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from ..config import get_settings
 from ..schemas.artist import ArtistSearch
 
 logger = logging.getLogger(__name__)
+
+
+class SpotifyServiceError(Exception):
+    """Raised when Spotify rejects a request, so callers can distinguish an
+    upstream failure from a genuinely empty result set."""
+
+    def __init__(self, message: str, status_code: int = 502):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+
+
+def _describe_spotify_error(exc: Exception) -> SpotifyServiceError:
+    if isinstance(exc, SpotifyOauthError):
+        return SpotifyServiceError(
+            "Spotify authentication failed. Check SPOTIFY_CLIENT_ID and "
+            "SPOTIFY_CLIENT_SECRET, then restart the backend.",
+            status_code=502,
+        )
+
+    if isinstance(exc, spotipy.SpotifyException):
+        # spotipy prefixes msg with the full request URL; keep only the reason.
+        upstream = (exc.msg or "").split("\n")[-1].strip() or "Spotify rejected the request."
+        if exc.http_status == 429:
+            return SpotifyServiceError("Spotify rate limit reached. Try again shortly.", 503)
+        if exc.http_status in (401, 403):
+            return SpotifyServiceError(f"Spotify denied the request: {upstream}", 502)
+        return SpotifyServiceError(f"Spotify error ({exc.http_status}): {upstream}", 502)
+
+    return SpotifyServiceError(f"Could not reach Spotify: {exc}", 502)
 
 
 class SpotifyService:
@@ -41,7 +71,7 @@ class SpotifyService:
 
         except Exception as e:
             logger.warning("Error searching artists: %s", e)
-            return []
+            raise _describe_spotify_error(e) from e
 
     async def get_artist_releases(
         self,

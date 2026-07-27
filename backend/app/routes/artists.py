@@ -6,7 +6,7 @@ from datetime import datetime
 from ..database import get_db
 from ..models import Artist
 from ..schemas.artist import ArtistCreate, ArtistResponse, ArtistSearch
-from ..services.spotify_service import SpotifyService
+from ..services.spotify_service import SpotifyService, SpotifyServiceError
 from ..rate_limit import rate_limit
 from ..security import require_authenticated_request, require_write_request
 
@@ -24,7 +24,10 @@ async def search_artists(
     _: None = Depends(rate_limit(max_requests=60, window_seconds=60)),
 ):
     spotify = SpotifyService()
-    results = await spotify.search_artists(query, limit)
+    try:
+        results = await spotify.search_artists(query, limit)
+    except SpotifyServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     return results
 
 

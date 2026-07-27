@@ -13,7 +13,7 @@ from ..services.lastfm_service import LastFmService
 from ..services.jellyfin_service import JellyfinService
 from ..services.plex_service import PlexService
 from ..services.navidrome_service import NavidromeService
-from ..services.spotify_service import SpotifyService
+from ..services.spotify_service import SpotifyService, SpotifyServiceError
 from ..services.gotify_service import GotifyService
 from ..services.ntfy_service import NtfyService
 from ..config import get_settings
@@ -233,7 +233,12 @@ async def import_lastfm_artists(
                     existing_count += 1
                     continue
 
-                spotify_results = await spotify.search_artists(artist_name, limit=1)
+                try:
+                    spotify_results = await spotify.search_artists(artist_name, limit=1)
+                except SpotifyServiceError as e:
+                    logger.warning("Spotify lookup failed for %s: %s", artist_name, e.message)
+                    skipped.append(artist_name)
+                    continue
 
                 if not spotify_results:
                     logger.info("Not found on Spotify: %s", artist_name)

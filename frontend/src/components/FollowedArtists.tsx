@@ -38,7 +38,7 @@ const FollowedArtists = ({ artists, isLoading, onUnfollow, onRefresh, searchQuer
   const [lastfmPeriod, setLastfmPeriod] = useState("3month");
   const [lastfmLimit, setLastfmLimit] = useState("50");
 
-  const { data: searchResults, isLoading: searching } = useSearchArtists(searchSubmitted);
+  const { data: searchResults, isLoading: searching, error: searchError } = useSearchArtists(searchSubmitted);
   const followArtist = useFollowArtist();
   const importLastFm = useImportLastFm();
 
@@ -109,7 +109,7 @@ const FollowedArtists = ({ artists, isLoading, onUnfollow, onRefresh, searchQuer
               {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
             </Button>
           </form>
-          {searchSubmitted && (searchResults?.length || 0) >= 0 && (
+          {searchSubmitted && !searchError && (searchResults?.length || 0) >= 0 && (
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] text-muted-foreground">
                 {searchResults?.length ?? 0} result{(searchResults?.length ?? 0) !== 1 ? "s" : ""} for "{searchSubmitted}"
@@ -156,7 +156,18 @@ const FollowedArtists = ({ artists, isLoading, onUnfollow, onRefresh, searchQuer
               ))}
             </div>
           )}
-          {searchResults && searchResults.length === 0 && searchSubmitted && (
+          {searchError && searchSubmitted && (
+            <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2">
+              <AlertTriangle className="h-3.5 w-3.5 text-destructive flex-shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-destructive">Search unavailable</p>
+                <p className="text-[10px] text-muted-foreground break-words">
+                  {searchError instanceof Error ? searchError.message : "Could not reach Spotify."}
+                </p>
+              </div>
+            </div>
+          )}
+          {!searchError && searchResults && searchResults.length === 0 && searchSubmitted && (
             <p className="text-xs text-muted-foreground">No artists found for "{searchSubmitted}"</p>
           )}
         </div>
