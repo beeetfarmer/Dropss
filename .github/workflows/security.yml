@@ -35,7 +35,7 @@ jobs:
         working-directory: frontend
         run: |
           npm ci
-          npm audit --audit-level=moderate
+          node scripts/audit-check.mjs
 
       - name: Setup Python
         uses: actions/setup-python@v5

@@ -1,0 +1,13 @@
+{
+  "comment": "Advisories consciously accepted for a bounded period. Each entry needs a reason and an expiry; audit-check.mjs fails once an entry expires, forcing a re-review rather than letting exceptions linger.",
+  "allow": [
+    {
+      "id": "GHSA-qwww-vcr4-c8h2",
+      "package": "react-router",
+      "severity": "high",
+      "reason": "RSC-mode CSRF bypass. Dropss is a client-side SPA using BrowserRouter with no React Server Components, no server actions and no SSR, so the affected code path is not present in the build. No fixed release exists: the advisory covers 7.12.0-8.2.0 while the fix for GHSA-337j-9hxr-rhxg requires >=7.18, and 7.18.1 is the latest published version. Downgrading to 7.11.0 would merely reinstate the other advisory.",
+      "expires": "2026-10-28",
+      "review": "Drop this entry once react-router publishes a release above 8.2.0."
+    }
+  ]
+}
