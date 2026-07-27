@@ -1,5 +1,7 @@
 # Environment variables
 .env
+.env.*
+!.env.docker.example
 
 # Python
 __pycache__/
