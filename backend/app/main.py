@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Dropss",
     description="Track your favorite Spotify artists and get notified of new releases",
-    version="0.2.0",
+    version="0.2.1",
     lifespan=lifespan,
     docs_url="/docs" if docs_enabled else None,
     redoc_url="/redoc" if docs_enabled else None,
@@ -85,7 +85,7 @@ app.include_router(settings_router)
 async def root():
     payload = {
         "message": "Dropss API",
-        "version": "0.2.0",
+        "version": "0.2.1",
         "health": "/health"
     }
     if docs_enabled:
