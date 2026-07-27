@@ -36,6 +36,8 @@ class SettingsUpdate(BaseModel):
     ntfy_topic: Optional[str] = None
     ntfy_username: Optional[str] = None
     ntfy_password: Optional[str] = None
+    telegram_bot_token: Optional[str] = None
+    telegram_chat_id: Optional[str] = None
     lastfm_api_key: Optional[str] = None
     lastfm_username: Optional[str] = None
     jellyfin_url: Optional[str] = None
@@ -94,6 +96,7 @@ async def get_settings_endpoint(_: None = Depends(rate_limit(max_requests=60, wi
         "spotify_client_id", "spotify_client_secret",
         "gotify_url", "gotify_token",
         "ntfy_url", "ntfy_topic", "ntfy_username", "ntfy_password",
+        "telegram_bot_token", "telegram_chat_id",
         "lastfm_api_key", "lastfm_username",
         "jellyfin_url", "jellyfin_api_key",
         "plex_url", "plex_token",

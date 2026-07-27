@@ -96,6 +96,7 @@ async def refresh_artist_releases(
     from ..config import get_settings
     from ..services.gotify_service import GotifyService
     from ..services.ntfy_service import NtfyService
+    from ..services.telegram_service import TelegramService
 
     settings = get_settings()
 
@@ -153,6 +154,12 @@ async def refresh_artist_releases(
         if settings.ntfy_url and settings.ntfy_topic:
             ntfy = NtfyService()
             await ntfy.send_release_notification(
+                artist.name,
+                new_releases
+            )
+        if settings.telegram_bot_token and settings.telegram_chat_id:
+            telegram = TelegramService()
+            await telegram.send_release_notification(
                 artist.name,
                 new_releases
             )

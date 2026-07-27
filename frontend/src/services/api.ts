@@ -169,6 +169,9 @@ export const integrationAPI = {
 
   testNtfy: () =>
     apiFetch<{ success: boolean; message: string }>("/integrations/ntfy/test", { method: "POST" }),
+
+  testTelegram: () =>
+    apiFetch<{ success: boolean; message: string }>("/integrations/telegram/test", { method: "POST" }),
 };
 
 export const settingsAPI = {

@@ -136,6 +136,7 @@ export interface ApiIntegrationStatus {
   navidrome_available: boolean;
   gotify_configured: boolean;
   ntfy_configured: boolean;
+  telegram_configured: boolean;
   spotify_configured: boolean;
   lastfm_configured: boolean;
   errors: string[];
