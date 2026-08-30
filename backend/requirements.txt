@@ -10,3 +10,4 @@ pydantic==2.10.3
 pydantic-settings==2.6.1
 psycopg[binary]==3.2.13
 alembic==1.13.0
+msgpack>=1.2.1  # transitive; pinned for GHSA-6v7p-g79w-8964 (OOB read)
