@@ -85,7 +85,7 @@ class SpotifyService:
             results = self.client.artist_albums(
                 artist_id,
                 album_type='album,single',
-                limit=50
+                limit=10  # Spotify capped list endpoints at 10 (Feb 2026); next() pages the rest
             )
 
             while results:
@@ -148,7 +148,7 @@ class SpotifyService:
 
     async def get_album_tracks(self, album_id: str) -> List[Dict[str, Any]]:
         try:
-            results = self.client.album_tracks(album_id, limit=50)
+            results = self.client.album_tracks(album_id, limit=10)  # Feb 2026 cap; next() pages the rest
             tracks = []
 
             while results:

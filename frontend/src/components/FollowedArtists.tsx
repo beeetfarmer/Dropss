@@ -139,10 +139,6 @@ const FollowedArtists = ({ artists, isLoading, onUnfollow, onRefresh, searchQuer
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{result.name}</p>
-                    <p className="text-[10px] text-muted-foreground truncate">
-                      {result.genres.slice(0, 3).join(", ") || "No genres"}
-                      {result.followers > 0 && ` · ${(result.followers / 1000).toFixed(0)}K followers`}
-                    </p>
                   </div>
                   <Button
                     size="sm"
