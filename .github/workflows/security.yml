@@ -99,6 +99,11 @@ jobs:
           path: .
           format: cyclonedx-json
           output-file: dropss-sbom.cdx.json
+          # On tag builds the action otherwise tries to attach the SBOM as a
+          # release asset, which needs contents:write and fails the job (and
+          # skips the publish) under this job's contents:read. The SBOM is kept
+          # as a workflow artifact below instead.
+          upload-release-assets: false
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
