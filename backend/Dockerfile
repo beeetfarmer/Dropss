@@ -5,9 +5,17 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
+# Patch OS packages (openssl/libcrypto3) shipped in the base image; Trivy gates
+# the build on HIGH/CRITICAL CVEs in os,library.
+RUN apk upgrade --no-cache
+
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# setuptools is bumped alongside pip to clear CVE-2025-47273 (path traversal).
+# pip is removed afterwards: the runtime never installs packages, and pip's
+# vendored bundle ships old msgpack/setuptools copies that Trivy flags.
+RUN pip install --no-cache-dir --upgrade pip setuptools && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip uninstall -y pip
 
 RUN addgroup --system app && adduser --system --ingroup app app
 
