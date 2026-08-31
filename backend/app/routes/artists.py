@@ -106,15 +106,18 @@ async def refresh_artist_releases(
 
     spotify = SpotifyService()
 
-    artist_info = await spotify.get_artist_info(artist.spotify_id)
-    if artist_info and artist_info.get('image_url'):
-        artist.image_url = artist_info['image_url']
-        db.flush()
+    try:
+        artist_info = await spotify.get_artist_info(artist.spotify_id)
+        if artist_info and artist_info.get('image_url'):
+            artist.image_url = artist_info['image_url']
+            db.flush()
 
-    releases_data = await spotify.get_artist_releases(
-        artist.spotify_id,
-        settings.release_months_back
-    )
+        releases_data = await spotify.get_artist_releases(
+            artist.spotify_id,
+            settings.release_months_back
+        )
+    except SpotifyServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
     new_count = 0
     new_releases = []
@@ -200,15 +203,18 @@ async def get_artist_all_releases(
 
     spotify = SpotifyService()
 
-    artist_info = await spotify.get_artist_info(artist.spotify_id)
-    if artist_info and artist_info.get('image_url'):
-        artist.image_url = artist_info['image_url']
-        db.flush()
+    try:
+        artist_info = await spotify.get_artist_info(artist.spotify_id)
+        if artist_info and artist_info.get('image_url'):
+            artist.image_url = artist_info['image_url']
+            db.flush()
 
-    releases_data = await spotify.get_artist_releases(
-        artist.spotify_id,
-        months_back=1200
-    )
+        releases_data = await spotify.get_artist_releases(
+            artist.spotify_id,
+            months_back=1200
+        )
+    except SpotifyServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
     for release_data in releases_data:
         existing = db.query(Release).filter(

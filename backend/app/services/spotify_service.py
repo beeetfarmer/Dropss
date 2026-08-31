@@ -139,8 +139,10 @@ class SpotifyService:
             return all_releases
 
         except Exception as e:
+            # Raise, don't return [], so a 429/upstream failure isn't reported
+            # to the user as "0 releases". See SpotifyServiceError docstring.
             logger.warning("Error fetching artist releases: %s", e)
-            return []
+            raise _describe_spotify_error(e) from e
 
     async def get_artist_info(self, artist_id: str) -> Optional[Dict[str, Any]]:
         try:
@@ -155,7 +157,7 @@ class SpotifyService:
             }
         except Exception as e:
             logger.warning("Error fetching artist info: %s", e)
-            return None
+            raise _describe_spotify_error(e) from e
 
     async def get_album_tracks(self, album_id: str) -> List[Dict[str, Any]]:
         try:
