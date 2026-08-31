@@ -2,6 +2,8 @@ from pydantic_settings import BaseSettings
 from functools import lru_cache
 from .settings_store import load_overrides
 
+APP_VERSION = "0.2.3"
+
 
 class Settings(BaseSettings):
     app_env: str = "development"

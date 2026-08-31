@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -45,6 +46,10 @@ async def check_for_new_releases():
         total_new = 0
 
         for artist in artists:
+            # Pace the sweep so paging every artist's discography doesn't burst
+            # past Spotify's rolling rate-limit window.
+            # ponytail: fixed 1s/artist; switch to Retry-After-aware backoff if still throttled
+            await asyncio.sleep(1)
             try:
                 logger.info("Checking releases for %s", artist.name)
 

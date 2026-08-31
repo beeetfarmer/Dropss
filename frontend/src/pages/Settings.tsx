@@ -295,6 +295,9 @@ const Settings = () => {
             <div>
               <h2 className="text-xl font-bold">Settings</h2>
               <p className="text-sm text-muted-foreground">Configure integrations and application preferences</p>
+              {settings?.app_version && (
+                <p className="text-xs text-muted-foreground/70 mt-1 font-mono">v{settings.app_version}</p>
+              )}
             </div>
             <Button
               onClick={handleSave}

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import spotipy
 from spotipy.cache_handler import CacheFileHandler
@@ -49,11 +50,20 @@ class SpotifyService:
             client_secret=settings.spotify_client_secret,
             cache_handler=cache_handler,
         )
-        self.client = spotipy.Spotify(auth_manager=auth_manager)
+        # requests_timeout caps a hung call; retries=0 fails fast on 429 instead
+        # of time.sleep()-ing the multi-hour Retry-After header.
+        # ponytail: retries=0 = no backoff; add short bounded backoff if transient 429s bite
+        self.client = spotipy.Spotify(
+            auth_manager=auth_manager,
+            requests_timeout=10,
+            retries=0,
+        )
 
     async def search_artists(self, query: str, limit: int = 10) -> List[ArtistSearch]:
         try:
-            results = self.client.search(q=query, type='artist', limit=limit)
+            results = await asyncio.to_thread(
+                self.client.search, q=query, type='artist', limit=limit
+            )
             artists = []
 
             for item in results['artists']['items']:
@@ -82,10 +92,11 @@ class SpotifyService:
             cutoff_date = datetime.now() - timedelta(days=months_back * 30)
 
             all_releases = []
-            results = self.client.artist_albums(
+            results = await asyncio.to_thread(
+                self.client.artist_albums,
                 artist_id,
                 album_type='album,single',
-                limit=10  # Spotify capped list endpoints at 10 (Feb 2026); next() pages the rest
+                limit=10,  # Spotify capped list endpoints at 10 (Feb 2026); next() pages the rest
             )
 
             while results:
@@ -119,7 +130,7 @@ class SpotifyService:
                         all_releases.append(release_data)
 
                 if results['next']:
-                    results = self.client.next(results)
+                    results = await asyncio.to_thread(self.client.next, results)
                 else:
                     break
 
@@ -128,12 +139,14 @@ class SpotifyService:
             return all_releases
 
         except Exception as e:
+            # Raise, don't return [], so a 429/upstream failure isn't reported
+            # to the user as "0 releases". See SpotifyServiceError docstring.
             logger.warning("Error fetching artist releases: %s", e)
-            return []
+            raise _describe_spotify_error(e) from e
 
     async def get_artist_info(self, artist_id: str) -> Optional[Dict[str, Any]]:
         try:
-            artist = self.client.artist(artist_id)
+            artist = await asyncio.to_thread(self.client.artist, artist_id)
             return {
                 'spotify_id': artist['id'],
                 'name': artist['name'],
@@ -144,11 +157,13 @@ class SpotifyService:
             }
         except Exception as e:
             logger.warning("Error fetching artist info: %s", e)
-            return None
+            raise _describe_spotify_error(e) from e
 
     async def get_album_tracks(self, album_id: str) -> List[Dict[str, Any]]:
         try:
-            results = self.client.album_tracks(album_id, limit=10)  # Feb 2026 cap; next() pages the rest
+            results = await asyncio.to_thread(
+                self.client.album_tracks, album_id, limit=10
+            )  # Feb 2026 cap; next() pages the rest
             tracks = []
 
             while results:
@@ -162,7 +177,7 @@ class SpotifyService:
                     })
 
                 if results['next']:
-                    results = self.client.next(results)
+                    results = await asyncio.to_thread(self.client.next, results)
                 else:
                     break
 
