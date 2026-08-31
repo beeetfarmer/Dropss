@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..config import SECRET_FIELDS, get_settings as get_app_settings
+from ..config import SECRET_FIELDS, APP_VERSION, get_settings as get_app_settings
 from ..database import get_db
 from ..models import ApiKey
 from ..rate_limit import rate_limit
@@ -115,6 +115,8 @@ async def get_settings_endpoint(_: None = Depends(rate_limit(max_requests=60, wi
             result[field] = _mask_secret(value)
         else:
             result[field] = value
+
+    result["app_version"] = APP_VERSION
 
     return result
 

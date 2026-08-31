@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .config import get_settings
+from .config import get_settings, APP_VERSION
 from .database import init_db
 from .logging_config import setup_logging
 from .routes import artists_router, releases_router
@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Dropss",
     description="Track your favorite Spotify artists and get notified of new releases",
-    version="0.2.2",
+    version=APP_VERSION,
     lifespan=lifespan,
     docs_url="/docs" if docs_enabled else None,
     redoc_url="/redoc" if docs_enabled else None,
@@ -85,7 +85,7 @@ app.include_router(settings_router)
 async def root():
     payload = {
         "message": "Dropss API",
-        "version": "0.2.2",
+        "version": APP_VERSION,
         "health": "/health"
     }
     if docs_enabled:
