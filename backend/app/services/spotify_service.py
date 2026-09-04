@@ -50,13 +50,14 @@ class SpotifyService:
             client_secret=settings.spotify_client_secret,
             cache_handler=cache_handler,
         )
-        # requests_timeout caps a hung call; retries=0 fails fast on 429 instead
-        # of time.sleep()-ing the multi-hour Retry-After header.
-        # ponytail: retries=0 = no backoff; add short bounded backoff if transient 429s bite
+        # Keep spotipy's default retry/backoff: Spotify emits short 429s as normal
+        # flow control and the default retry absorbs them with a ~1-2s wait. The
+        # to_thread wrapping on every call below keeps any backoff off the event
+        # loop, so it can no longer freeze the app the way retries=0 was meant to
+        # avoid. requests_timeout just caps a genuinely hung socket.
         self.client = spotipy.Spotify(
             auth_manager=auth_manager,
             requests_timeout=10,
-            retries=0,
         )
 
     async def search_artists(self, query: str, limit: int = 10) -> List[ArtistSearch]:

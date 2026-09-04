@@ -133,6 +133,8 @@ const AnimatedBackground = () => {
       });
     }
 
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -167,10 +169,10 @@ const AnimatedBackground = () => {
         if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
       }
 
-      animId = requestAnimationFrame(draw);
+      if (!reduceMotion) animId = requestAnimationFrame(draw);
     };
 
-    draw();
+    draw();  // one static frame under reduced motion, else it self-schedules
 
     return () => {
       cancelAnimationFrame(animId);

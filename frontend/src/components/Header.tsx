@@ -46,7 +46,7 @@ const Header = ({ searchQuery, onSearchChange }: HeaderProps) => {
   };
 
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/60">
+    <header className="sticky top-0 z-50 bg-background/90">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
         <div className="flex-shrink-0 cursor-pointer" onClick={() => navigate("/")}>
           <h1 className="text-2xl font-bold tracking-tight">
