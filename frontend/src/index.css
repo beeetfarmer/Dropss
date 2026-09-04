@@ -76,7 +76,10 @@
 
 @layer components {
   .glass-card {
-    @apply bg-card/80 backdrop-blur-xl border border-glass-border rounded-xl;
+    /* No backdrop-blur: a live blur over the animated background forces a GPU
+       reblur of every card every frame, which dropped the whole UI to ~30fps.
+       Plain translucency over the animation is cheap alpha compositing. */
+    @apply bg-card/90 border border-glass-border rounded-xl;
   }
 
   .glass-card-hover {
