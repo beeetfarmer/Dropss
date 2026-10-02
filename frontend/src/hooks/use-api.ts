@@ -160,12 +160,16 @@ export function useRefreshArtist() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (artistId: number) => artistAPI.refresh(artistId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: keys.followedArtists });
-      qc.invalidateQueries({ queryKey: keys.latestReleases });
-      qc.invalidateQueries({ queryKey: keys.allReleases });
-      qc.invalidateQueries({ queryKey: keys.stats });
-    },
+    // Returning the refetches keeps the mutation pending until the refreshed
+    // releases are actually on screen, so loading indicators last that long.
+    onSuccess: (_data, artistId) =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: keys.followedArtists }),
+        qc.invalidateQueries({ queryKey: keys.latestReleases }),
+        qc.invalidateQueries({ queryKey: keys.allReleases }),
+        qc.invalidateQueries({ queryKey: keys.stats }),
+        qc.invalidateQueries({ queryKey: keys.artistReleases(artistId) }),
+      ]),
   });
 }
 

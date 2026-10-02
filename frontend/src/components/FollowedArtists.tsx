@@ -22,17 +22,19 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useSearchArtists, useFollowArtist, useImportLastFm } from "@/hooks/use-api";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface FollowedArtistsProps {
   artists: Artist[];
   isLoading?: boolean;
   onUnfollow: (id: number) => void;
   onRefresh: (id: number) => void;
+  refreshingIds?: Set<number>;
   searchQuery: string;
   integrationStatus?: ApiIntegrationStatus;
 }
 
-const FollowedArtists = ({ artists, isLoading, onUnfollow, onRefresh, searchQuery, integrationStatus }: FollowedArtistsProps) => {
+const FollowedArtists = ({ artists, isLoading, onUnfollow, onRefresh, refreshingIds, searchQuery, integrationStatus }: FollowedArtistsProps) => {
   const navigate = useNavigate();
   const [artistSearch, setArtistSearch] = useState("");
   const [searchSubmitted, setSearchSubmitted] = useState("");
@@ -289,11 +291,16 @@ const FollowedArtists = ({ artists, isLoading, onUnfollow, onRefresh, searchQuer
                         Spotify <ArrowUpRight className="size-3" />
                       </a>
                       <button
-                        aria-label={`Refresh ${artist.name}`}
-                        className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground [&:active_svg]:rotate-180"
+                        aria-label={refreshingIds?.has(artist.id) ? `Refreshing ${artist.name}` : `Refresh ${artist.name}`}
+                        aria-busy={refreshingIds?.has(artist.id)}
+                        disabled={refreshingIds?.has(artist.id)}
+                        className={cn(
+                          "inline-flex size-7 items-center justify-center rounded-full transition-colors hover:bg-white/[0.06] hover:text-foreground disabled:cursor-wait",
+                          refreshingIds?.has(artist.id) ? "bg-primary/10 text-primary" : "text-muted-foreground",
+                        )}
                         onClick={() => onRefresh(artist.id)}
                       >
-                        <RefreshCw className="size-3 transition-transform duration-500" />
+                        <RefreshCw className={cn("size-3", refreshingIds?.has(artist.id) && "animate-spin")} />
                       </button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>

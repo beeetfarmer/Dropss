@@ -66,11 +66,24 @@ const Index = () => {
     });
   };
 
+  const [refreshingIds, setRefreshingIds] = useState<Set<number>>(new Set());
+
+  // mutateAsync rather than mutate: per-call callbacks of mutate() only fire for
+  // the latest call, which would drop toasts and spinners when refreshing
+  // several artists at once.
   const handleRefresh = (id: number) => {
-    refreshArtist.mutate(id, {
-      onSuccess: (data) => toast.success(`${data.artist}: ${data.new_releases} new releases found`),
-      onError: (e) => toast.error(`Refresh failed: ${e.message}`),
-    });
+    setRefreshingIds((prev) => new Set(prev).add(id));
+    refreshArtist
+      .mutateAsync(id)
+      .then((data) => toast.success(`${data.artist}: ${data.new_releases} new releases found`))
+      .catch((e: Error) => toast.error(`Refresh failed: ${e.message}`))
+      .finally(() =>
+        setRefreshingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        }),
+      );
   };
 
   const jellyfinAvailable = integrationStatus?.jellyfin_available ?? false;
@@ -140,6 +153,7 @@ const Index = () => {
                 isLoading={artistsLoading}
                 onUnfollow={handleUnfollow}
                 onRefresh={handleRefresh}
+                refreshingIds={refreshingIds}
                 searchQuery={searchQuery}
                 integrationStatus={integrationStatus}
               />
