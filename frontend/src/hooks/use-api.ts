@@ -22,6 +22,7 @@ const keys = {
   searchArtists: (q: string) => ["artists", "search", q] as const,
   artistReleases: (id: number) => ["artists", id, "releases"] as const,
   integrationStatus: ["integrations", "status"] as const,
+  integrationHealth: ["integrations", "health"] as const,
   settings: ["settings"] as const,
   apiKeys: ["settings", "api-keys"] as const,
 };
@@ -93,6 +94,14 @@ export function useIntegrationStatus() {
   return useQuery<ApiIntegrationStatus>({
     queryKey: keys.integrationStatus,
     queryFn: () => integrationAPI.checkStatus(),
+  });
+}
+
+export function useIntegrationHealth() {
+  return useQuery({
+    queryKey: keys.integrationHealth,
+    queryFn: () => integrationAPI.checkHealth(),
+    staleTime: 30_000,
   });
 }
 
@@ -219,6 +228,7 @@ export function useUpdateSettings() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.settings });
       qc.invalidateQueries({ queryKey: keys.integrationStatus });
+      qc.invalidateQueries({ queryKey: keys.integrationHealth });
     },
   });
 }

@@ -137,10 +137,17 @@ export interface ApiIntegrationStatus {
   gotify_configured: boolean;
   ntfy_configured: boolean;
   telegram_configured: boolean;
+  apprise_configured: boolean;
   spotify_configured: boolean;
   lastfm_configured: boolean;
   errors: string[];
 }
+
+export type IntegrationHealth = "ok" | "error" | "unconfigured";
+export type IntegrationName =
+  | "spotify" | "lastfm" | "jellyfin" | "plex" | "navidrome"
+  | "gotify" | "ntfy" | "telegram" | "apprise";
+export type ApiIntegrationHealth = Record<IntegrationName, IntegrationHealth>;
 
 export interface ApiLastFmImportResult {
   total_artists: number;

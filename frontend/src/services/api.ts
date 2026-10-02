@@ -4,6 +4,7 @@ import type {
   ApiArtistSearch,
   ApiStats,
   ApiIntegrationStatus,
+  ApiIntegrationHealth,
   ApiLastFmImportResult,
   ApiArtistReleases,
   ApiTrack,
@@ -140,6 +141,8 @@ export const releaseAPI = {
 export const integrationAPI = {
   checkStatus: () => apiFetch<ApiIntegrationStatus>("/integrations/status"),
 
+  checkHealth: () => apiFetch<ApiIntegrationHealth>("/integrations/health"),
+
   importLastFm: (period: string, limit: number) =>
     apiFetch<ApiLastFmImportResult>("/integrations/lastfm/import", {
       method: "POST",
@@ -172,6 +175,9 @@ export const integrationAPI = {
 
   testTelegram: () =>
     apiFetch<{ success: boolean; message: string }>("/integrations/telegram/test", { method: "POST" }),
+
+  testApprise: () =>
+    apiFetch<{ success: boolean; message: string }>("/integrations/apprise/test", { method: "POST" }),
 };
 
 export const settingsAPI = {

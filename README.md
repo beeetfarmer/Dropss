@@ -15,7 +15,7 @@ Dropss is a self-hosted app to track followed artists, detect new releases, and 
 - Track artists from Spotify
 - See latest releases in a clean dashboard
 - Daily scheduled release checks
-- Optional notifications via Gotify and ntfy
+- Optional notifications via Gotify, ntfy, Telegram, and Apprise (Discord, Slack, Pushover, email, and 100+ more)
 - Optional library checks against Jellyfin, Plex, and Navidrome
 - Optional Last.fm import for top artists
 - Single-user session auth with optional API keys for external apps
@@ -117,6 +117,8 @@ Open `http://localhost:8080`.
 - Last.fm
 - Gotify
 - ntfy
+- Telegram
+- Apprise
 - Jellyfin
 - Plex
 - Navidrome

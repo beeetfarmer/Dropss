@@ -17,6 +17,7 @@ from ..services.spotify_service import SpotifyService, SpotifyServiceError
 from ..services.gotify_service import GotifyService
 from ..services.ntfy_service import NtfyService
 from ..services.telegram_service import TelegramService
+from ..services.apprise_service import AppriseService
 from ..config import get_settings
 from ..rate_limit import rate_limit
 from ..security import get_rate_limit_identity, require_authenticated_request, require_write_request
@@ -78,6 +79,8 @@ async def check_integration_status(_: None = Depends(rate_limit(max_requests=30,
 
     telegram_configured = bool(settings.telegram_bot_token and settings.telegram_chat_id)
 
+    apprise_configured = bool(settings.apprise_urls)
+
     spotify_configured = bool(settings.spotify_client_id and settings.spotify_client_secret)
 
     lastfm_configured = bool(settings.lastfm_api_key and settings.lastfm_username)
@@ -89,10 +92,18 @@ async def check_integration_status(_: None = Depends(rate_limit(max_requests=30,
         "gotify_configured": gotify_configured,
         "ntfy_configured": ntfy_configured,
         "telegram_configured": telegram_configured,
+        "apprise_configured": apprise_configured,
         "spotify_configured": spotify_configured,
         "lastfm_configured": lastfm_configured,
         "errors": errors
     }
+
+
+@router.get("/health")
+async def integration_health_endpoint(_: None = Depends(rate_limit(max_requests=10, window_seconds=60))):
+    """ok / error / unconfigured per integration. Slower than /status: it authenticates."""
+    from ..services.health import integration_health
+    return await integration_health()
 
 
 @router.post("/gotify/test")
@@ -201,6 +212,82 @@ async def test_telegram_connection(
 
     except Exception:
         raise HTTPException(status_code=500, detail="Telegram test failed")
+
+
+class LastFmImportRequest(BaseModel):
+    period: str = "overall"
+    limit: int = Field(default=50, ge=1, le=200)
+
+
+class LastFmImportResponse(BaseModel):
+    total_artists: int
+    new_artists: int
+    existing_artists: int
+    artists_added: List[str]
+
+
+class JellyfinCheckResponse(BaseModel):
+    release_id: int
+    in_library: bool
+    match_type: str
+    match_confidence: float
+    available_tracks: List[str]
+    missing_tracks: List[str]
+
+
+class PlexCheckResponse(BaseModel):
+    release_id: int
+    in_library: bool
+    match_type: str
+    match_confidence: float
+    available_tracks: List[str]
+    missing_tracks: List[str]
+
+
+class NavidromeCheckResponse(BaseModel):
+    release_id: int
+    in_library: bool
+    match_type: str
+    match_confidence: float
+    available_tracks: List[str]
+    missing_tracks: List[str]
+
+
+
+@router.post("/apprise/test")
+async def test_apprise_connection(
+    request: Request,
+    __: None = Depends(require_write_request),
+    _: None = Depends(rate_limit(max_requests=5, window_seconds=60)),
+):
+    settings = get_settings()
+
+    if not settings.apprise_urls:
+        raise HTTPException(
+            status_code=400,
+            detail="Apprise is not configured. Please set APPRISE_URLS."
+        )
+
+    try:
+        identity = get_rate_limit_identity(request)
+        record_anomaly_event(
+            category="notification_test_calls",
+            key=identity,
+            threshold=8,
+            window_seconds=600,
+            logger=logger,
+            details={"endpoint": "/integrations/apprise/test"},
+        )
+        apprise_service = AppriseService()
+        success = await apprise_service.test_connection()
+
+        if success:
+            return {"success": True, "message": "Apprise test notification sent successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to send Apprise notification")
+
+    except Exception:
+        raise HTTPException(status_code=500, detail="Apprise test failed")
 
 
 class LastFmImportRequest(BaseModel):

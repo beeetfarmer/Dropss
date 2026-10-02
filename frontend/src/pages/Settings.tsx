@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Save, Loader2, Music, Bell, Radio, Server, Clock, Eye, EyeOff, Send, KeyRound, Copy, Trash2 } from "lucide-react";
+import { Save, Loader2, RefreshCw, Music, Bell, BellRing, Megaphone, Radio, Server, Clock, Eye, EyeOff, Send, KeyRound, Copy, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,9 +10,9 @@ import { MagicCard } from "@/components/ui/magic-card";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
 import { cn } from "@/lib/utils";
-import { useSettings, useUpdateSettings, useApiKeys, useCreateApiKey, useRevokeApiKey } from "@/hooks/use-api";
+import { useSettings, useUpdateSettings, useIntegrationHealth, useApiKeys, useCreateApiKey, useRevokeApiKey } from "@/hooks/use-api";
 import { integrationAPI } from "@/services/api";
-import type { ApiSettingsUpdate, ApiKeyScope } from "@/types/music";
+import type { ApiSettingsUpdate, ApiKeyScope, ApiIntegrationHealth, IntegrationHealth, IntegrationName } from "@/types/music";
 import { toast } from "sonner";
 
 interface FieldConfig {
@@ -30,13 +30,16 @@ interface SectionConfig {
   fields: FieldConfig[];
   testAction?: () => Promise<{ success: boolean; message: string }>;
   testLabel?: string;
+  service?: IntegrationName;
+  hint?: string;
 }
 
 const sections: SectionConfig[] = [
   {
     title: "Spotify",
     icon: <Music className="size-4" />,
-    description: "Spotify API credentials for artist search and release tracking",
+    description: "API credentials for artist search and release tracking",
+    service: "spotify",
     fields: [
       { key: "spotify_client_id", label: "Client ID", placeholder: "Your Spotify Client ID" },
       { key: "spotify_client_secret", label: "Client Secret", placeholder: "Set via environment", type: "password", envOnly: true },
@@ -45,7 +48,8 @@ const sections: SectionConfig[] = [
   {
     title: "Last.fm",
     icon: <Radio className="size-4" />,
-    description: "Import your top artists from Last.fm",
+    description: "Import your top artists from your listening history",
+    service: "lastfm",
     fields: [
       { key: "lastfm_api_key", label: "API Key", placeholder: "Set via environment", type: "password", envOnly: true },
       { key: "lastfm_username", label: "Username", placeholder: "Your Last.fm username" },
@@ -55,6 +59,7 @@ const sections: SectionConfig[] = [
     title: "Jellyfin",
     icon: <Server className="size-4" />,
     description: "Check releases against your Jellyfin library",
+    service: "jellyfin",
     fields: [
       { key: "jellyfin_url", label: "Server URL", placeholder: "http://your-jellyfin:8096" },
       { key: "jellyfin_api_key", label: "API Key", placeholder: "Set via environment", type: "password", envOnly: true },
@@ -64,6 +69,7 @@ const sections: SectionConfig[] = [
     title: "Plex",
     icon: <Server className="size-4" />,
     description: "Check releases against your Plex library",
+    service: "plex",
     fields: [
       { key: "plex_url", label: "Server URL", placeholder: "http://your-plex:32400" },
       { key: "plex_token", label: "Token", placeholder: "Set via environment", type: "password", envOnly: true },
@@ -73,46 +79,12 @@ const sections: SectionConfig[] = [
     title: "Navidrome",
     icon: <Server className="size-4" />,
     description: "Check releases against your Navidrome library (Subsonic API)",
+    service: "navidrome",
     fields: [
       { key: "navidrome_url", label: "Server URL", placeholder: "http://your-navidrome:4533" },
       { key: "navidrome_username", label: "Username", placeholder: "Your Navidrome username" },
       { key: "navidrome_password", label: "Password", placeholder: "Set via environment", type: "password", envOnly: true },
     ],
-  },
-  {
-    title: "Gotify",
-    icon: <Bell className="size-4" />,
-    description: "Push notifications via Gotify",
-    fields: [
-      { key: "gotify_url", label: "Server URL", placeholder: "http://your-gotify:8080" },
-      { key: "gotify_token", label: "App Token", placeholder: "Set via environment", type: "password", envOnly: true },
-    ],
-    testAction: () => integrationAPI.testGotify(),
-    testLabel: "Send Test Notification",
-  },
-  {
-    title: "Ntfy",
-    icon: <Bell className="size-4" />,
-    description: "Push notifications via ntfy",
-    fields: [
-      { key: "ntfy_url", label: "Server URL", placeholder: "https://ntfy.sh" },
-      { key: "ntfy_topic", label: "Topic", placeholder: "Your ntfy topic" },
-      { key: "ntfy_username", label: "Username (optional)", placeholder: "Username for auth" },
-      { key: "ntfy_password", label: "Password (optional)", placeholder: "Set via environment", type: "password", envOnly: true },
-    ],
-    testAction: () => integrationAPI.testNtfy(),
-    testLabel: "Send Test Notification",
-  },
-  {
-    title: "Telegram",
-    icon: <Bell className="size-4" />,
-    description: "Push notifications via a Telegram bot",
-    fields: [
-      { key: "telegram_bot_token", label: "Bot Token", placeholder: "Set via environment", type: "password", envOnly: true },
-      { key: "telegram_chat_id", label: "Chat ID", placeholder: "e.g. 123456789" },
-    ],
-    testAction: () => integrationAPI.testTelegram(),
-    testLabel: "Send Test Notification",
   },
   {
     title: "Application",
@@ -126,6 +98,84 @@ const sections: SectionConfig[] = [
   },
 ];
 
+const notificationProviders: SectionConfig[] = [
+  {
+    title: "Gotify",
+    icon: <Bell className="size-4" />,
+    description: "Self-hosted push notifications",
+    service: "gotify",
+    fields: [
+      { key: "gotify_url", label: "Server URL", placeholder: "http://your-gotify:8080" },
+      { key: "gotify_token", label: "App Token", placeholder: "Set via environment", type: "password", envOnly: true },
+    ],
+    testAction: () => integrationAPI.testGotify(),
+    testLabel: "Send test",
+  },
+  {
+    title: "Ntfy",
+    icon: <BellRing className="size-4" />,
+    description: "Pub-sub push notifications to any device",
+    service: "ntfy",
+    fields: [
+      { key: "ntfy_url", label: "Server URL", placeholder: "https://ntfy.sh" },
+      { key: "ntfy_topic", label: "Topic", placeholder: "Your ntfy topic" },
+      { key: "ntfy_username", label: "Username (optional)", placeholder: "Username for auth" },
+      { key: "ntfy_password", label: "Password (optional)", placeholder: "Set via environment", type: "password", envOnly: true },
+    ],
+    testAction: () => integrationAPI.testNtfy(),
+    testLabel: "Send test",
+  },
+  {
+    title: "Telegram",
+    icon: <Send className="size-4" />,
+    description: "Messages from your own Telegram bot",
+    service: "telegram",
+    fields: [
+      { key: "telegram_bot_token", label: "Bot Token", placeholder: "Set via environment", type: "password", envOnly: true },
+      { key: "telegram_chat_id", label: "Chat ID", placeholder: "e.g. 123456789" },
+    ],
+    testAction: () => integrationAPI.testTelegram(),
+    testLabel: "Send test",
+  },
+  {
+    title: "Apprise",
+    icon: <Megaphone className="size-4" />,
+    description: "Discord, Slack, Pushover, email and 100+ more services",
+    service: "apprise",
+    fields: [
+      { key: "apprise_urls", label: "Apprise URLs", placeholder: "Set APPRISE_URLS in environment", type: "password", envOnly: true },
+    ],
+    hint: "Comma-separated, e.g. discord://id/token, pover://user@token",
+    testAction: () => integrationAPI.testApprise(),
+    testLabel: "Send test",
+  },
+];
+
+const byTitle = (...titles: string[]) => titles.map((t) => sections.find((s) => s.title === t)!);
+
+const GROUPS: { title: string; icon: React.ReactNode; description: string; providers: SectionConfig[] }[] = [
+  {
+    title: "Music sources",
+    icon: <Music className="size-4" />,
+    description: "Where your artists and listening history come from.",
+    providers: byTitle("Spotify", "Last.fm"),
+  },
+  {
+    title: "Media servers",
+    icon: <Server className="size-4" />,
+    description: "Check new releases against what's already in your library.",
+    providers: byTitle("Jellyfin", "Plex", "Navidrome"),
+  },
+  {
+    title: "Notifications",
+    icon: <Bell className="size-4" />,
+    description: "Get pinged when a followed artist drops something new. Every configured service is notified.",
+    providers: notificationProviders,
+  },
+];
+
+const applicationSection = byTitle("Application")[0];
+
 const API_KEY_SCOPE_OPTIONS: Array<{ scope: ApiKeyScope; label: string; description: string }> = [
   { scope: "read", label: "Read", description: "Access GET endpoints" },
   { scope: "write", label: "Write", description: "Run mutating API actions" },
@@ -136,6 +186,7 @@ const Settings = () => {
   const { data: settings, isLoading } = useSettings();
   const updateSettings = useUpdateSettings();
   const { data: apiKeys, isLoading: apiKeysLoading } = useApiKeys();
+  const { data: health, isFetching: healthChecking, refetch: recheckHealth } = useIntegrationHealth();
   const createApiKey = useCreateApiKey();
   const revokeApiKey = useRevokeApiKey();
   const [formData, setFormData] = useState<Record<string, string>>({});
@@ -150,7 +201,7 @@ const Settings = () => {
   useEffect(() => {
     if (settings) {
       const data: Record<string, string> = {};
-      for (const section of sections) {
+      for (const section of [...sections, ...notificationProviders]) {
         for (const field of section.fields) {
           data[field.key] = String(settings[field.key] ?? "");
         }
@@ -287,7 +338,75 @@ const Settings = () => {
 
   const slug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const inputCls = "h-10 rounded-xl border-white/[0.07] bg-white/[0.03] font-mono text-sm focus-visible:border-primary/40 focus-visible:ring-0 disabled:opacity-60";
-  const navItems = [...sections.map((s) => s.title), "API Keys"];
+  const navItems = [...GROUPS.map((g) => g.title), applicationSection.title, "API Keys"];
+
+  const renderSectionBody = (section: SectionConfig) => (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {section.fields.map((field) => {
+          const isSecret = field.type === "password";
+          const isVisible = visibleSecrets.has(field.key);
+          const isDirty = dirty.has(field.key);
+
+          return (
+            <div key={field.key} className="space-y-1.5">
+              <Label htmlFor={field.key} className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
+                {field.label}
+                {field.envOnly && <span className="rounded-full bg-white/[0.05] px-1.5 py-px text-[9px] tracking-wider uppercase">env</span>}
+                <AnimatePresence>
+                  {isDirty && (
+                    <motion.span
+                      initial={{ opacity: 0, scale: 0.6 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.6 }}
+                      className="size-1.5 rounded-full bg-primary shadow-[0_0_8px] shadow-primary"
+                      title="Modified"
+                    />
+                  )}
+                </AnimatePresence>
+              </Label>
+              <div className="relative">
+                <Input
+                  id={field.key}
+                  type={isSecret && !isVisible ? "password" : field.type === "number" ? "number" : "text"}
+                  value={formData[field.key] ?? ""}
+                  onChange={(e) => handleChange(field.key, e.target.value)}
+                  placeholder={field.placeholder}
+                  disabled={field.envOnly}
+                  className={cn(inputCls, isSecret && "pr-10", isDirty && "border-primary/40")}
+                />
+                {isSecret && (
+                  <button
+                    type="button"
+                    aria-label={isVisible ? "Hide value" : "Show value"}
+                    className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                    onClick={() => toggleSecret(field.key)}
+                  >
+                    {isVisible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {section.hint && <p className="-mt-2 font-mono text-[11px] text-muted-foreground/70">{section.hint}</p>}
+
+      {section.testAction && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 rounded-full"
+          disabled={testingSection === section.title}
+          onClick={() => handleTest(section)}
+        >
+          {testingSection === section.title ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+          {section.testLabel}
+        </Button>
+      )}
+    </>
+  );
 
   return (
     <AppShell>
@@ -327,73 +446,29 @@ const Settings = () => {
             ))
           ) : (
             <>
-              {sections.map((section, i) => (
-                <BlurFade key={section.title} inView delay={Math.min(i, 4) * 0.05} offset={10} direction="up">
-                  <SettingsCard id={slug(section.title)} icon={section.icon} title={section.title} description={section.description}>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      {section.fields.map((field) => {
-                        const isSecret = field.type === "password";
-                        const isVisible = visibleSecrets.has(field.key);
-                        const isDirty = dirty.has(field.key);
-
-                        return (
-                          <div key={field.key} className="space-y-1.5">
-                            <Label htmlFor={field.key} className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
-                              {field.label}
-                              {field.envOnly && <span className="rounded-full bg-white/[0.05] px-1.5 py-px text-[9px] tracking-wider uppercase">env</span>}
-                              <AnimatePresence>
-                                {isDirty && (
-                                  <motion.span
-                                    initial={{ opacity: 0, scale: 0.6 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.6 }}
-                                    className="size-1.5 rounded-full bg-primary shadow-[0_0_8px] shadow-primary"
-                                    title="Modified"
-                                  />
-                                )}
-                              </AnimatePresence>
-                            </Label>
-                            <div className="relative">
-                              <Input
-                                id={field.key}
-                                type={isSecret && !isVisible ? "password" : field.type === "number" ? "number" : "text"}
-                                value={formData[field.key] ?? ""}
-                                onChange={(e) => handleChange(field.key, e.target.value)}
-                                placeholder={field.placeholder}
-                                disabled={field.envOnly}
-                                className={cn(inputCls, isSecret && "pr-10", isDirty && "border-primary/40")}
-                              />
-                              {isSecret && (
-                                <button
-                                  type="button"
-                                  aria-label={isVisible ? "Hide value" : "Show value"}
-                                  className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-                                  onClick={() => toggleSecret(field.key)}
-                                >
-                                  {isVisible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {section.testAction && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 rounded-full"
-                        disabled={testingSection === section.title}
-                        onClick={() => handleTest(section)}
-                      >
-                        {testingSection === section.title ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
-                        {section.testLabel}
-                      </Button>
-                    )}
-                  </SettingsCard>
+              {GROUPS.map((group, i) => (
+                <BlurFade key={group.title} inView delay={i * 0.05} offset={10} direction="up">
+                  <ProviderGroup
+                    id={slug(group.title)}
+                    {...group}
+                    health={health}
+                    checking={healthChecking}
+                    onRecheck={() => recheckHealth()}
+                    renderBody={renderSectionBody}
+                  />
                 </BlurFade>
               ))}
+
+              <BlurFade inView offset={10} direction="up">
+                <SettingsCard
+                  id={slug(applicationSection.title)}
+                  icon={applicationSection.icon}
+                  title={applicationSection.title}
+                  description={applicationSection.description}
+                >
+                  {renderSectionBody(applicationSection)}
+                </SettingsCard>
+              </BlurFade>
 
               <BlurFade inView offset={10} direction="up">
                 <SettingsCard
@@ -563,6 +638,144 @@ const Settings = () => {
         )}
       </AnimatePresence>
     </AppShell>
+  );
+};
+
+interface ProviderGroupProps {
+  id: string;
+  title: string;
+  icon: React.ReactNode;
+  description: string;
+  providers: SectionConfig[];
+  health?: ApiIntegrationHealth;
+  checking: boolean;
+  onRecheck: () => void;
+  renderBody: (section: SectionConfig) => React.ReactNode;
+}
+
+const HEALTH_STYLE: Record<IntegrationHealth, { dot: string; pill: string; label: (name: string) => string }> = {
+  ok: {
+    dot: "bg-status-available shadow-[0_0_6px] shadow-status-available",
+    pill: "bg-status-available/10 text-status-available ring-status-available/25",
+    label: () => "Connected",
+  },
+  error: {
+    dot: "bg-status-missing shadow-[0_0_6px] shadow-status-missing",
+    pill: "bg-status-missing/10 text-status-missing ring-status-missing/25",
+    label: (name) => `Can't reach ${name}`,
+  },
+  unconfigured: {
+    dot: "bg-white/20",
+    pill: "bg-white/[0.04] text-muted-foreground ring-white/10",
+    label: () => "Not configured",
+  },
+};
+
+const HealthPill = ({ state, name, checking, onRecheck }: { state?: IntegrationHealth; name: string; checking: boolean; onRecheck: () => void }) => (
+  <button
+    type="button"
+    onClick={onRecheck}
+    disabled={checking}
+    title="Check again"
+    className={cn(
+      "group inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 ring-inset transition-colors disabled:cursor-default",
+      state ? HEALTH_STYLE[state].pill : HEALTH_STYLE.unconfigured.pill,
+    )}
+  >
+    <span className={cn("size-1.5 rounded-full", state ? HEALTH_STYLE[state].dot : "animate-pulse bg-white/30")} />
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.span
+        key={checking ? "checking" : state ?? "none"}
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -4 }}
+        transition={{ duration: 0.15 }}
+      >
+        {checking || !state ? "Checking…" : HEALTH_STYLE[state].label(name)}
+      </motion.span>
+    </AnimatePresence>
+    <RefreshCw className={cn("size-3 opacity-0 transition-opacity group-hover:opacity-70", checking && "animate-spin opacity-70")} />
+  </button>
+);
+
+const ProviderGroup = ({ id, title, icon, description, providers, health, checking, onRecheck, renderBody }: ProviderGroupProps) => {
+  const [active, setActive] = useState(0);
+  const [dir, setDir] = useState(1);
+  const select = (i: number) => {
+    setDir(i > active ? 1 : -1);
+    setActive(i);
+  };
+
+  return (
+    <SettingsCard id={id} icon={icon} title={title} description={description}>
+      <div role="tablist" aria-label={title} className="relative flex gap-1 overflow-x-auto rounded-xl border border-white/[0.06] bg-black/20 p-1">
+        {providers.map((p, i) => {
+          const selected = i === active;
+          const state = p.service ? health?.[p.service] : undefined;
+          return (
+            <button
+              key={p.title}
+              role="tab"
+              aria-selected={selected}
+              onClick={() => select(i)}
+              className={cn(
+                "relative flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors",
+                selected ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {selected && (
+                <motion.span
+                  layoutId={`${id}-pill`}
+                  className="absolute inset-0 rounded-lg bg-white/[0.07] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.06)]"
+                  transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                />
+              )}
+              <span className={cn("relative transition-colors", selected && "text-primary")}>{p.icon}</span>
+              <span className="relative">{p.title}</span>
+              <span
+                title={state ? HEALTH_STYLE[state].label(p.title) : "Checking…"}
+                className={cn(
+                  "relative size-1.5 rounded-full transition-all duration-500",
+                  state ? HEALTH_STYLE[state].dot : "animate-pulse bg-white/20",
+                )}
+              />
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="relative overflow-hidden">
+        <AnimatePresence mode="popLayout" initial={false} custom={dir}>
+          <motion.div
+            key={active}
+            custom={dir}
+            variants={{
+              enter: (d: number) => ({ x: d * 40, opacity: 0, filter: "blur(4px)" }),
+              center: { x: 0, opacity: 1, filter: "blur(0px)" },
+              exit: (d: number) => ({ x: d * -40, opacity: 0, filter: "blur(4px)" }),
+            }}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="space-y-5"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">{providers[active].description}</p>
+              {providers[active].service && (
+                <HealthPill
+                  state={health?.[providers[active].service!]}
+                  name={providers[active].title}
+                  checking={checking}
+                  onRecheck={onRecheck}
+                />
+              )}
+            </div>
+            {renderBody(providers[active])}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </SettingsCard>
   );
 };
 
