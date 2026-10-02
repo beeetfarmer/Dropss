@@ -1,135 +1,210 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap')
+layer(base);
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+@import 'tw-animate-css';
 
-@layer base {
-  :root {
-    --background: 220 16% 8%;
-    --foreground: 210 20% 92%;
+@custom-variant dark (&:is(.dark *));
 
-    --card: 220 14% 11%;
-    --card-foreground: 210 20% 92%;
+@utility container {
+  margin-inline: auto;
+  padding-inline: 1rem;
+  @media (width >= 640px) {
+    padding-inline: 2rem;
+  }
+  @media (width >= 1400px) {
+    max-width: 1400px;
+  }
+}
 
-    --popover: 220 14% 11%;
-    --popover-foreground: 210 20% 92%;
+@theme {
+  --font-sans: Geist, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --font-serif: 'Instrument Serif', ui-serif, Georgia, serif;
 
-    --primary: 160 84% 39%;
-    --primary-foreground: 220 16% 8%;
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
 
-    --secondary: 220 14% 16%;
-    --secondary-foreground: 210 20% 85%;
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
 
-    --muted: 220 12% 14%;
-    --muted-foreground: 215 12% 50%;
+  --color-sidebar: hsl(var(--sidebar-background));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
 
-    --accent: 220 14% 18%;
-    --accent-foreground: 210 20% 92%;
+  --color-badge-album: hsl(var(--badge-album));
+  --color-badge-ep: hsl(var(--badge-ep));
+  --color-badge-single: hsl(var(--badge-single));
+  --color-badge-new: hsl(var(--badge-new));
+  --color-status-available: hsl(var(--status-available));
+  --color-status-partial: hsl(var(--status-partial));
+  --color-status-missing: hsl(var(--status-missing));
 
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
 
-    --border: 220 12% 18%;
-    --input: 220 12% 18%;
-    --ring: 160 84% 39%;
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
 
-    --radius: 0.75rem;
-
-    --badge-album: 270 70% 60%;
-    --badge-ep: 160 84% 39%;
-    --badge-single: 210 80% 55%;
-    --badge-new: 45 93% 58%;
-
-    --status-available: 160 84% 39%;
-    --status-partial: 45 93% 58%;
-    --status-missing: 0 72% 51%;
-
-    --glass: 220 14% 12%;
-    --glass-border: 220 12% 22%;
-
-    --sidebar-background: 220 14% 11%;
-    --sidebar-foreground: 210 20% 92%;
-    --sidebar-primary: 160 84% 39%;
-    --sidebar-primary-foreground: 220 16% 8%;
-    --sidebar-accent: 220 14% 18%;
-    --sidebar-accent-foreground: 210 20% 92%;
-    --sidebar-border: 220 12% 18%;
-    --sidebar-ring: 160 84% 39%;
+  @keyframes accordion-down {
+    from { height: 0; opacity: 0; }
+    to { height: var(--radix-accordion-content-height); opacity: 1; }
+  }
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); opacity: 1; }
+    to { height: 0; opacity: 0; }
   }
 }
 
 @layer base {
+  :root {
+    --background: 240 8% 4%;
+    --foreground: 240 6% 94%;
+
+    --card: 240 6% 7%;
+    --card-foreground: 240 6% 94%;
+
+    --popover: 240 6% 8%;
+    --popover-foreground: 240 6% 94%;
+
+    --primary: 160 84% 39%;
+    --primary-foreground: 240 8% 4%;
+
+    --secondary: 240 5% 12%;
+    --secondary-foreground: 240 6% 88%;
+
+    --muted: 240 5% 11%;
+    --muted-foreground: 240 5% 56%;
+
+    --accent: 240 5% 13%;
+    --accent-foreground: 240 6% 94%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 5% 14%;
+    --input: 240 5% 16%;
+    --ring: 160 84% 39%;
+
+    --radius: 0.875rem;
+
+    --badge-album: 268 75% 70%;
+    --badge-ep: 160 84% 39%;
+    --badge-single: 205 85% 62%;
+    --badge-new: 42 95% 62%;
+
+    --status-available: 160 84% 39%;
+    --status-partial: 42 95% 62%;
+    --status-missing: 0 72% 60%;
+
+    --sidebar-background: 240 6% 7%;
+    --sidebar-foreground: 240 6% 94%;
+    --sidebar-primary: 160 84% 39%;
+    --sidebar-primary-foreground: 240 8% 4%;
+    --sidebar-accent: 240 5% 13%;
+    --sidebar-accent-foreground: 240 6% 94%;
+    --sidebar-border: 240 5% 14%;
+    --sidebar-ring: 160 84% 39%;
+  }
+
   * {
     @apply border-border;
   }
 
+  html {
+    color-scheme: dark;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Space Grotesk', sans-serif;
+    font-feature-settings: "ss01", "cv11";
   }
 
-  code, .font-mono {
-    font-family: 'JetBrains Mono', monospace;
-  }
-}
-
-@layer components {
-  .glass-card {
-    /* No backdrop-blur: a live blur over the animated background forces a GPU
-       reblur of every card every frame, which dropped the whole UI to ~30fps.
-       Plain translucency over the animation is cheap alpha compositing. */
-    @apply bg-card/90 border border-glass-border rounded-xl;
-  }
-
-  .glass-card-hover {
-    @apply glass-card transition-all duration-300 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5;
-  }
-
-  .badge-album {
-    @apply bg-badge-album/15 text-badge-album border border-badge-album/25;
-  }
-
-  .badge-ep {
-    @apply bg-badge-ep/15 text-badge-ep border border-badge-ep/25;
-  }
-
-  .badge-single {
-    @apply bg-badge-single/15 text-badge-single border border-badge-single/25;
-  }
-
-  .badge-new {
-    @apply bg-badge-new/15 text-badge-new border border-badge-new/30 font-semibold;
-  }
-
-  .status-dot {
-    @apply w-2.5 h-2.5 rounded-full;
-  }
-
-  .status-available {
-    @apply bg-status-available shadow-sm shadow-status-available/50;
-  }
-
-  .status-partial {
-    @apply bg-status-partial shadow-sm shadow-status-partial/50;
-  }
-
-  .status-missing {
-    @apply bg-status-missing shadow-sm shadow-status-missing/50;
-  }
-
-  .glow-primary {
-    box-shadow: 0 0 30px -5px hsl(var(--primary) / 0.15);
-  }
-
-  .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-badge-single;
+  ::selection {
+    background: hsl(var(--primary) / 0.3);
   }
 }
 
-@layer utilities {
-  .scrollbar-thin {
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted)) transparent;
+/* Surface used for every card-like panel. No backdrop-blur: a live blur over
+   animated backgrounds forces a GPU reblur every frame (see 0df6831). */
+@utility surface {
+  @apply rounded-2xl border border-white/[0.06] bg-card/80 shadow-[inset_0_1px_0_0_rgb(255_255_255/0.04)];
+}
+
+@utility badge-album {
+  @apply bg-badge-album/10 text-badge-album ring-1 ring-inset ring-badge-album/25;
+}
+@utility badge-ep {
+  @apply bg-badge-ep/10 text-badge-ep ring-1 ring-inset ring-badge-ep/25;
+}
+@utility badge-single {
+  @apply bg-badge-single/10 text-badge-single ring-1 ring-inset ring-badge-single/25;
+}
+
+@utility status-dot {
+  @apply size-2 rounded-full;
+}
+@utility status-available {
+  @apply bg-status-available shadow-[0_0_8px] shadow-status-available/60;
+}
+@utility status-partial {
+  @apply bg-status-partial shadow-[0_0_8px] shadow-status-partial/60;
+}
+@utility status-missing {
+  @apply bg-status-missing shadow-[0_0_8px] shadow-status-missing/60;
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+}
+
+/* Magic UI keyframes (added by the shadcn registry). */
+@theme inline {
+  --animate-shiny-text: shiny-text 8s infinite;
+  --animate-shimmer-slide: shimmer-slide var(--speed) ease-in-out infinite alternate;
+  --animate-spin-around: spin-around calc(var(--speed) * 2) infinite linear;
+
+  @keyframes shiny-text {
+    0%, 90%, 100% { background-position: calc(-100% - var(--shiny-width)) 0; }
+    30%, 60% { background-position: calc(100% + var(--shiny-width)) 0; }
+  }
+  @keyframes shimmer-slide {
+    to { transform: translate(calc(100cqw - 100%), 0); }
+  }
+  @keyframes spin-around {
+    0% { transform: translateZ(0) rotate(0); }
+    15%, 35% { transform: translateZ(0) rotate(90deg); }
+    65%, 85% { transform: translateZ(0) rotate(270deg); }
+    100% { transform: translateZ(0) rotate(360deg); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

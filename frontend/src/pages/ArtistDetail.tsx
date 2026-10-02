@@ -1,16 +1,18 @@
 import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, RefreshCw, Server, ChevronDown, Users, Loader2, ExternalLink, Disc3, Music, ListMusic } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import AnimatedBackground from "@/components/AnimatedBackground";
+import { motion, AnimatePresence } from "motion/react";
+import { ArrowLeft, RefreshCw, Server, Loader2, ArrowUpRight } from "lucide-react";
+import AppShell, { Avatar } from "@/components/AppShell";
+import { ActionPill, EmptyState, RELEASE_GRID, SectionToggle, SkeletonGrid } from "@/components/LatestReleases";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { BorderBeam } from "@/components/ui/border-beam";
+import { NumberTicker } from "@/components/ui/number-ticker";
 import ReleaseCard from "@/components/ReleaseCard";
 import { useArtistReleases, useRefreshArtist, useMarkSeen, useIntegrationStatus } from "@/hooks/use-api";
 import { useLibraryCheck } from "@/hooks/use-library-check";
 import { integrationAPI } from "@/services/api";
 import CheckProgressDialog from "@/components/CheckProgressDialog";
-import { Release, ReleaseType } from "@/types/music";
+import { Release } from "@/types/music";
 import { toast } from "sonner";
 
 const typeLabels: Record<string, string> = {
@@ -19,11 +21,11 @@ const typeLabels: Record<string, string> = {
   single: "Singles",
   compilation: "Compilations",
 };
-const typeBadgeClass: Record<string, string> = {
-  album: "badge-album",
-  ep: "badge-ep",
-  single: "badge-single",
-  compilation: "badge-album",
+const typeDot: Record<string, string> = {
+  album: "bg-badge-album",
+  ep: "bg-badge-ep",
+  single: "bg-badge-single",
+  compilation: "bg-badge-album",
 };
 
 const ArtistDetail = () => {
@@ -97,195 +99,164 @@ const ArtistDetail = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background relative">
-        <AnimatedBackground />
-        <div className="relative z-10">
-          <div className="relative h-64 overflow-hidden">
-            <Skeleton className="absolute inset-0" />
-          </div>
-          <div className="container mx-auto px-4 py-8 space-y-6">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="aspect-square rounded-lg" />
-              ))}
+      <AppShell>
+        <div className="container space-y-10 pt-10">
+          <div className="flex items-end gap-6">
+            <div className="size-32 animate-pulse rounded-full bg-white/[0.05] md:size-44" />
+            <div className="flex-1 space-y-3">
+              <div className="h-12 w-2/3 max-w-md animate-pulse rounded-xl bg-white/[0.05]" />
+              <div className="h-8 w-64 animate-pulse rounded-full bg-white/[0.04]" />
             </div>
           </div>
+          <SkeletonGrid count={6} />
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-background relative">
-        <AnimatedBackground />
-        <div className="relative z-10 container mx-auto px-4 py-8 text-center">
-          <p className="text-muted-foreground">Artist not found</p>
-          <Button variant="ghost" className="mt-4" onClick={() => navigate("/")}>
-            Go Back
-          </Button>
+      <AppShell>
+        <div className="container pt-16">
+          <EmptyState>Artist not found.</EmptyState>
+          <div className="mt-6 flex justify-center">
+            <ActionPill onClick={() => navigate("/")}><ArrowLeft /> Go back</ActionPill>
+          </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   const { artist } = data;
   const sectionOrder = ["album", "ep", "single"];
+  const jellyfinAvailable = integrationStatus?.jellyfin_available ?? false;
+  const plexAvailable = integrationStatus?.plex_available ?? false;
+  const navidromeAvailable = integrationStatus?.navidrome_available ?? false;
 
   return (
-    <div className="min-h-screen bg-background relative">
-      <AnimatedBackground />
-      <div className="relative z-10">
-        <div className="relative overflow-hidden">
-          {artist.avatarUrl && (
-            <div className="absolute inset-0">
-              <img
-                src={artist.avatarUrl}
-                alt=""
-                className="w-full h-full object-cover scale-110 blur-2xl opacity-30"
-              />
-              <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/70 to-background" />
-            </div>
-          )}
-
-          <div className="relative z-10 container mx-auto px-4 pt-4">
-            <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-foreground" onClick={() => navigate(-1)}>
-              <ArrowLeft className="h-4 w-4" /> Back
-            </Button>
+    <AppShell>
+      <section className="relative">
+        {artist.avatarUrl && (
+          <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-24 h-[420px] overflow-hidden">
+            <motion.img
+              src={artist.avatarUrl}
+              alt=""
+              initial={{ opacity: 0, scale: 1.3 }}
+              animate={{ opacity: 0.35, scale: 1.15 }}
+              transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+              className="size-full object-cover blur-3xl saturate-150"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-background/30 via-background/70 to-background" />
           </div>
+        )}
 
-          <div className="relative z-10 container mx-auto px-4 pb-8 pt-4">
-            <div className="flex items-end gap-6">
-              <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden ring-4 ring-border/50 shadow-2xl flex-shrink-0">
-                {artist.avatarUrl ? (
-                  <img src={artist.avatarUrl} alt={artist.name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full bg-secondary flex items-center justify-center">
-                    <Users className="h-12 w-12 text-muted-foreground" />
-                  </div>
-                )}
-              </div>
+        <div className="relative container pt-4 pb-10">
+          <button
+            onClick={() => navigate(-1)}
+            className="group mb-8 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-0.5" /> Back
+          </button>
 
-              <div className="flex-1 min-w-0 space-y-3">
-                <h1 className="text-3xl md:text-4xl font-bold tracking-tight truncate">{artist.name}</h1>
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:gap-8">
+            <BlurFade className="relative shrink-0 self-start rounded-full sm:self-auto">
+              <Avatar src={artist.avatarUrl} alt={artist.name} className="relative size-32 shadow-2xl shadow-black/50 ring-0 md:size-44" />
+              <BorderBeam size={90} duration={8} borderWidth={2} colorFrom="hsl(var(--primary))" colorTo="hsl(var(--primary) / 0)" />
+            </BlurFade>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button size="sm" variant="secondary" className="gap-1.5 text-xs" asChild>
-                    <a href={artist.spotifyUrl} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-3.5 w-3.5" /> Spotify
-                    </a>
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="gap-1.5 text-xs"
-                    onClick={handleRefresh}
-                    disabled={refreshArtist.isPending}
-                  >
-                    {refreshArtist.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                    Sync Releases
-                  </Button>
-                  {integrationStatus?.jellyfin_available && (
-                    <Button size="sm" variant="secondary" className="gap-1.5 text-xs" onClick={handleCheckAllJellyfin}>
-                      <Server className="h-3.5 w-3.5" /> Check Jellyfin
-                    </Button>
-                  )}
-                  {integrationStatus?.plex_available && (
-                    <Button size="sm" variant="secondary" className="gap-1.5 text-xs" onClick={handleCheckAllPlex}>
-                      <Server className="h-3.5 w-3.5" /> Check Plex
-                    </Button>
-                  )}
-                  {integrationStatus?.navidrome_available && (
-                    <Button size="sm" variant="secondary" className="gap-1.5 text-xs" onClick={handleCheckAllNavidrome}>
-                      <Server className="h-3.5 w-3.5" /> Check Navidrome
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
+            <div className="min-w-0 flex-1 space-y-5">
+              <BlurFade delay={0.08}>
+                <p className="mb-2 text-[11px] font-medium tracking-[0.25em] text-primary uppercase">Artist</p>
+                <h1 className="font-serif text-5xl leading-[0.95] tracking-tight break-words md:text-7xl">{artist.name}</h1>
+              </BlurFade>
 
-            <div className="flex items-center gap-8 mt-6">
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-full bg-badge-album/20 flex items-center justify-center">
-                  <Disc3 className="h-4 w-4 text-badge-album" />
-                </div>
-                <div>
-                  <p className="text-lg font-bold font-mono">{stats.albums}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Albums</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-full bg-badge-ep/20 flex items-center justify-center">
-                  <Music className="h-4 w-4 text-badge-ep" />
-                </div>
-                <div>
-                  <p className="text-lg font-bold font-mono">{stats.eps + stats.singles}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">EPs & Singles</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center">
-                  <ListMusic className="h-4 w-4 text-primary" />
-                </div>
-                <div>
-                  <p className="text-lg font-bold font-mono">{stats.totalTracks}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total Tracks</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="container mx-auto px-4 py-6 space-y-8">
-          {sectionOrder.map((type) => {
-            const items = grouped[type];
-            if (!items?.length) return null;
-            const collapsed = collapsedSections.has(type);
-            const label = typeLabels[type] ?? type;
-            const badgeClass = typeBadgeClass[type] ?? "badge-album";
-
-            return (
-              <div key={type}>
-                <button
-                  className="flex items-center gap-2 mb-4 cursor-pointer group"
-                  onClick={() => toggleSection(type)}
+              <BlurFade delay={0.14} className="flex flex-wrap items-center gap-2">
+                <a
+                  href={artist.spotifyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-medium text-primary-foreground transition-all hover:brightness-110 active:scale-[0.97]"
                 >
-                  <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${collapsed ? "-rotate-90" : ""}`} />
-                  <h2 className={`text-lg font-semibold ${badgeClass.replace("badge-", "text-badge-")}`}>
-                    {label}
-                  </h2>
-                  <span className="text-sm text-muted-foreground font-mono">({items.length})</span>
-                </button>
-                <AnimatePresence>
-                  {!collapsed && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3"
-                    >
-                      {items.map((r) => (
-                        <ReleaseCard key={r.id} release={r} onMarkSeen={handleMarkSeen} jellyfinAvailable={integrationStatus?.jellyfin_available} plexAvailable={integrationStatus?.plex_available} navidromeAvailable={integrationStatus?.navidrome_available} />
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            );
-          })}
-
-          {data.releases.length === 0 && (
-            <div className="text-center py-16 text-muted-foreground">
-              <p className="text-sm">No releases found for this artist.</p>
+                  Open in Spotify <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                </a>
+                <ActionPill onClick={handleRefresh} disabled={refreshArtist.isPending}>
+                  {refreshArtist.isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+                  Sync releases
+                </ActionPill>
+                {jellyfinAvailable && <ActionPill onClick={handleCheckAllJellyfin}><Server /> Check Jellyfin</ActionPill>}
+                {plexAvailable && <ActionPill onClick={handleCheckAllPlex}><Server /> Check Plex</ActionPill>}
+                {navidromeAvailable && <ActionPill onClick={handleCheckAllNavidrome}><Server /> Check Navidrome</ActionPill>}
+              </BlurFade>
             </div>
-          )}
+          </div>
+
+          <BlurFade delay={0.2}>
+            <dl className="mt-10 flex flex-wrap gap-x-10 gap-y-4 border-t border-white/[0.06] pt-6">
+              <HeroStat label="Albums" value={stats.albums} dot="bg-badge-album" />
+              <HeroStat label="EPs & Singles" value={stats.eps + stats.singles} dot="bg-badge-ep" />
+              <HeroStat label="Total tracks" value={stats.totalTracks} dot="bg-primary" />
+            </dl>
+          </BlurFade>
         </div>
+      </section>
+
+      <div className="container space-y-10">
+        {sectionOrder.map((type) => {
+          const items = grouped[type];
+          if (!items?.length) return null;
+          const collapsed = collapsedSections.has(type);
+
+          return (
+            <section key={type}>
+              <SectionToggle
+                label={typeLabels[type] ?? type}
+                count={items.length}
+                collapsed={collapsed}
+                onClick={() => toggleSection(type)}
+                dotClass={typeDot[type] ?? "bg-badge-album"}
+              />
+              <AnimatePresence initial={false}>
+                {!collapsed && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                    className="overflow-hidden"
+                  >
+                    <div className={`${RELEASE_GRID} pt-1 pb-2`}>
+                      {items.map((r, i) => (
+                        <BlurFade key={r.id} inView delay={Math.min(i % 12, 11) * 0.035} offset={12} direction="up">
+                          <ReleaseCard release={r} onMarkSeen={handleMarkSeen} jellyfinAvailable={jellyfinAvailable} plexAvailable={plexAvailable} navidromeAvailable={navidromeAvailable} />
+                        </BlurFade>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </section>
+          );
+        })}
+
+        {data.releases.length === 0 && <EmptyState>No releases found for this artist.</EmptyState>}
       </div>
+
       <CheckProgressDialog {...jellyfinCheck.dialogProps} />
       <CheckProgressDialog {...plexCheck.dialogProps} />
       <CheckProgressDialog {...navidromeCheck.dialogProps} />
-    </div>
+    </AppShell>
   );
 };
+
+const HeroStat = ({ label, value, dot }: { label: string; value: number; dot: string }) => (
+  <div>
+    <dt className="flex items-center gap-2 text-[11px] tracking-widest text-muted-foreground uppercase">
+      <span className={`size-1.5 rounded-full ${dot}`} /> {label}
+    </dt>
+    <dd className="mt-1 font-mono text-3xl font-medium tabular-nums">
+      {value === 0 ? "0" : <NumberTicker value={value} className="text-foreground dark:text-foreground" />}
+    </dd>
+  </div>
+);
 
 export default ArtistDetail;

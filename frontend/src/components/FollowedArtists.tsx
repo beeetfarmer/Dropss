@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { ExternalLink, RefreshCw, UserMinus, Search, AlertTriangle, Loader2, Music, Users, X } from "lucide-react";
+import { ArrowUpRight, RefreshCw, UserMinus, Search, AlertTriangle, Loader2, Radio, X, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { MagicCard } from "@/components/ui/magic-card";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { Avatar } from "@/components/AppShell";
+import { EmptyState } from "@/components/LatestReleases";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Artist, ApiIntegrationStatus, SearchArtist } from "@/types/music";
 import {
@@ -91,247 +93,269 @@ const FollowedArtists = ({ artists, isLoading, onUnfollow, onRefresh, searchQuer
     return !q || a.name.toLowerCase().includes(q);
   });
 
+  const inputCls = "h-10 rounded-xl border-white/[0.07] bg-white/[0.03] text-sm focus-visible:border-primary/40 focus-visible:ring-0";
+
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="glass-card p-4 space-y-3">
-          <h3 className="text-sm font-semibold flex items-center gap-2">
-            <Search className="h-4 w-4 text-primary" /> Find Artists on Spotify
-          </h3>
-          <form onSubmit={handleSearch} className="flex gap-2">
-            <Input
-              placeholder="Search artist name..."
-              value={artistSearch}
-              onChange={(e) => setArtistSearch(e.target.value)}
-              className="bg-secondary border-border h-9 text-sm"
-            />
-            <Button size="sm" className="h-9" type="submit" disabled={searching}>
-              {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
-            </Button>
-          </form>
-          {searchSubmitted && !searchError && (searchResults?.length || 0) >= 0 && (
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] text-muted-foreground">
-                {searchResults?.length ?? 0} result{(searchResults?.length ?? 0) !== 1 ? "s" : ""} for "{searchSubmitted}"
-              </span>
+    <div className="space-y-10">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <BlurFade>
+          <Panel icon={<Search className="size-4" />} title="Find artists on Spotify" hint="Search by name and follow to start tracking releases.">
+            <form onSubmit={handleSearch} className="flex gap-2">
+              <Input
+                placeholder="Artist name…"
+                value={artistSearch}
+                onChange={(e) => setArtistSearch(e.target.value)}
+                className={inputCls}
+              />
+              <Button className="h-10 rounded-xl px-5" type="submit" disabled={searching}>
+                {searching ? <Loader2 className="size-4 animate-spin" /> : "Search"}
+              </Button>
+            </form>
+            {searchSubmitted && !searchError && (
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-muted-foreground">
+                  {searchResults?.length ?? 0} result{(searchResults?.length ?? 0) !== 1 ? "s" : ""} for “{searchSubmitted}”
+                </span>
+                <button
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-white/[0.05] hover:text-foreground"
+                  onClick={() => { setSearchSubmitted(""); setArtistSearch(""); }}
+                >
+                  <X className="size-3" /> Clear
+                </button>
+              </div>
+            )}
+            {searchResults && searchResults.length > 0 && (
+              <div className="scrollbar-thin -mx-1 max-h-72 space-y-1 overflow-y-auto px-1">
+                {searchResults.map((result, i) => (
+                  <BlurFade key={result.spotifyId} delay={i * 0.03} offset={6} direction="up">
+                    <div className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-white/[0.04]">
+                      <Avatar src={result.imageUrl} alt={result.name} className="size-10" />
+                      <p className="min-w-0 flex-1 truncate text-sm font-medium">{result.name}</p>
+                      <Button
+                        size="sm"
+                        className="h-8 gap-1 rounded-full px-3 text-xs"
+                        onClick={() => handleFollow(result)}
+                        disabled={followArtist.isPending}
+                      >
+                        <Plus className="size-3" /> Follow
+                      </Button>
+                    </div>
+                  </BlurFade>
+                ))}
+              </div>
+            )}
+            {searchError && searchSubmitted && (
+              <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3">
+                <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-destructive" />
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-destructive">Search unavailable</p>
+                  <p className="text-[11px] break-words text-muted-foreground">
+                    {searchError instanceof Error ? searchError.message : "Could not reach Spotify."}
+                  </p>
+                </div>
+              </div>
+            )}
+            {!searchError && searchResults && searchResults.length === 0 && searchSubmitted && (
+              <p className="text-xs text-muted-foreground">No artists found for “{searchSubmitted}”</p>
+            )}
+          </Panel>
+        </BlurFade>
+
+        <BlurFade delay={0.06}>
+          <Panel icon={<Radio className="size-4" />} title="Import from Last.fm" hint="Follow your most-played artists in one go.">
+            <div className="flex gap-2">
+              <Select value={lastfmPeriod} onValueChange={setLastfmPeriod}>
+                <SelectTrigger className={`${inputCls} w-36`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7day">7 Days</SelectItem>
+                  <SelectItem value="1month">1 Month</SelectItem>
+                  <SelectItem value="3month">3 Months</SelectItem>
+                  <SelectItem value="6month">6 Months</SelectItem>
+                  <SelectItem value="12month">12 Months</SelectItem>
+                  <SelectItem value="overall">Overall</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                placeholder="Limit"
+                aria-label="Number of artists"
+                value={lastfmLimit}
+                onChange={(e) => setLastfmLimit(e.target.value)}
+                min={1}
+                max={200}
+                className={`${inputCls} w-24 font-mono`}
+              />
               <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 text-[10px] gap-1 text-muted-foreground"
-                onClick={() => { setSearchSubmitted(""); setArtistSearch(""); }}
+                variant="secondary"
+                className="h-10 flex-1 rounded-xl"
+                onClick={handleLastFmImport}
+                disabled={importLastFm.isPending}
               >
-                <X className="h-3 w-3" /> Clear
+                {importLastFm.isPending ? <Loader2 className="size-4 animate-spin" /> : "Import"}
               </Button>
             </div>
-          )}
-          {searchResults && searchResults.length > 0 && (
-            <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-thin">
-              {searchResults.map((result) => (
-                <div key={result.spotifyId} className="flex items-center gap-3 p-2 rounded-lg bg-secondary/50">
-                  <div className="w-10 h-10 rounded-full overflow-hidden ring-1 ring-border flex-shrink-0">
-                    {result.imageUrl ? (
-                      <img src={result.imageUrl} alt={result.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-muted flex items-center justify-center">
-                        <Music className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{result.name}</p>
-                  </div>
-                  <Button
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => handleFollow(result)}
-                    disabled={followArtist.isPending}
-                  >
-                    Follow
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-          {searchError && searchSubmitted && (
-            <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2">
-              <AlertTriangle className="h-3.5 w-3.5 text-destructive flex-shrink-0 mt-0.5" />
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-destructive">Search unavailable</p>
-                <p className="text-[10px] text-muted-foreground break-words">
-                  {searchError instanceof Error ? searchError.message : "Could not reach Spotify."}
-                </p>
-              </div>
-            </div>
-          )}
-          {!searchError && searchResults && searchResults.length === 0 && searchSubmitted && (
-            <p className="text-xs text-muted-foreground">No artists found for "{searchSubmitted}"</p>
-          )}
-        </div>
+          </Panel>
+        </BlurFade>
+      </div>
 
-        <div className="glass-card p-4 space-y-3">
-          <h3 className="text-sm font-semibold flex items-center gap-2">
-            <RefreshCw className="h-4 w-4 text-badge-single" /> Import from Last.fm
+      <div>
+        <div className="mb-5 flex flex-wrap items-center gap-3">
+          <h3 className="font-serif text-3xl tracking-tight">
+            {filtered.length} <span className="text-muted-foreground italic">artist{filtered.length !== 1 ? "s" : ""}</span>
           </h3>
-          <div className="flex gap-2">
-            <Select value={lastfmPeriod} onValueChange={setLastfmPeriod}>
-              <SelectTrigger className="bg-secondary border-border h-9 text-sm w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7day">7 Days</SelectItem>
-                <SelectItem value="1month">1 Month</SelectItem>
-                <SelectItem value="3month">3 Months</SelectItem>
-                <SelectItem value="6month">6 Months</SelectItem>
-                <SelectItem value="12month">12 Months</SelectItem>
-                <SelectItem value="overall">Overall</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex-1" />
+          <div className="relative w-full sm:w-56">
+            <Search className="absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
-              type="number"
-              placeholder="Limit"
-              value={lastfmLimit}
-              onChange={(e) => setLastfmLimit(e.target.value)}
-              min={1}
-              max={200}
-              className="bg-secondary border-border h-9 text-sm w-20"
+              placeholder="Filter artists…"
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              className="h-9 rounded-full border-white/[0.07] bg-white/[0.03] pl-8 text-xs focus-visible:border-primary/40 focus-visible:ring-0"
             />
-            <Button
-              size="sm"
-              variant="secondary"
-              className="h-9"
-              onClick={handleLastFmImport}
-              disabled={importLastFm.isPending}
-            >
-              {importLastFm.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Import"}
-            </Button>
           </div>
-          <p className="text-[10px] text-muted-foreground">Import your top artists from Last.fm.</p>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-destructive/30 px-3.5 text-xs text-destructive transition-colors hover:bg-destructive/10">
+                <UserMinus className="size-3.5" /> Unfollow all
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <AlertTriangle className="size-5 text-destructive" /> Unfollow all artists?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will remove all {artists.length} artists and their releases. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => artists.forEach(a => onUnfollow(a.id))}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Unfollow All
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
-      </div>
 
-      <div className="flex items-center gap-3">
-        <h3 className="text-sm font-semibold text-muted-foreground flex-shrink-0">
-          {filtered.length} Artist{filtered.length !== 1 ? "s" : ""}
-        </h3>
-        <div className="flex-1" />
-        <div className="relative w-48">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            placeholder="Filter artists..."
-            value={filterQuery}
-            onChange={(e) => setFilterQuery(e.target.value)}
-            className="pl-8 bg-secondary/50 border-border h-8 text-xs"
-          />
-        </div>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button size="sm" variant="destructive" className="h-8 text-xs gap-1 flex-shrink-0">
-              <UserMinus className="h-3 w-3" /> Unfollow All
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-destructive" /> Unfollow all artists?
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                This will remove all {artists.length} artists and their releases. This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => artists.forEach(a => onUnfollow(a.id))}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Unfollow All
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
-
-      {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-48 rounded-lg" />
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-          {filtered.map((artist, i) => (
-            <motion.div
-              key={artist.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.03 }}
-              className="glass-card-hover p-4 flex flex-col items-center text-center space-y-3 cursor-pointer"
-              onClick={() => navigate(`/artist/${artist.id}`)}
-            >
-              <div className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-border">
-                {artist.avatarUrl ? (
-                  <img src={artist.avatarUrl} alt={artist.name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full bg-secondary flex items-center justify-center">
-                    <Users className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                )}
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold truncate max-w-full">{artist.name}</h4>
-              </div>
-              <div className="flex gap-1.5 w-full" onClick={(e) => e.stopPropagation()}>
-                <Button size="sm" variant="ghost" className="h-7 flex-1 text-[10px] gap-1" asChild>
-                  <a href={artist.spotifyUrl} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-3 w-3" /> Spotify
-                  </a>
-                </Button>
-                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onRefresh(artist.id)}>
-                  <RefreshCw className="h-3 w-3" />
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                    >
-                      <UserMinus className="h-3 w-3" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle className="flex items-center gap-2">
-                        <AlertTriangle className="h-5 w-5 text-destructive" /> Unfollow {artist.name}?
-                      </AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will remove {artist.name} and all their releases from your library.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => onUnfollow(artist.id)}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+        {isLoading ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="surface h-56 animate-pulse" style={{ animationDelay: `${i * 60}ms` }} />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <EmptyState>No artists found. Search above to add artists.</EmptyState>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            {filtered.map((artist, i) => (
+              <BlurFade key={artist.id} inView delay={Math.min(i % 12, 11) * 0.035} offset={12} direction="up">
+                <MagicCard
+                  className="rounded-2xl"
+                  gradientSize={220}
+                  gradientColor="hsl(var(--primary) / 0.10)"
+                  gradientOpacity={1}
+                  gradientFrom="hsl(var(--primary))"
+                  gradientTo="hsl(var(--primary) / 0.3)"
+                >
+                  <div
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => navigate(`/artist/${artist.id}`)}
+                    onKeyDown={(e) => { if (e.key === "Enter") navigate(`/artist/${artist.id}`); }}
+                    className="group/artist flex cursor-pointer flex-col items-center p-4 pt-6 text-center outline-none"
+                  >
+                    <div className="relative">
+                      <div className="absolute -inset-2 rounded-full bg-primary/25 opacity-0 blur-xl transition-opacity duration-500 group-hover/artist:opacity-100" />
+                      <Avatar
+                        src={artist.avatarUrl}
+                        alt={artist.name}
+                        className="relative size-24 ring-white/10 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/artist:scale-105"
+                      />
+                    </div>
+                    <h4 className="mt-4 w-full truncate text-sm font-medium" title={artist.name}>{artist.name}</h4>
+                    <div className="mt-3 flex w-full items-center justify-center gap-1" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                      <a
+                        href={artist.spotifyUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-7 flex-1 items-center justify-center gap-1 rounded-full bg-white/[0.05] text-[11px] transition-colors hover:bg-white/[0.1]"
                       >
-                        Unfollow
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      )}
-
-      {!isLoading && filtered.length === 0 && (
-        <div className="text-center py-16 text-muted-foreground">
-          <p className="text-sm">No artists found. Search above to add artists.</p>
-        </div>
-      )}
+                        Spotify <ArrowUpRight className="size-3" />
+                      </a>
+                      <button
+                        aria-label={`Refresh ${artist.name}`}
+                        className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground [&:active_svg]:rotate-180"
+                        onClick={() => onRefresh(artist.id)}
+                      >
+                        <RefreshCw className="size-3 transition-transform duration-500" />
+                      </button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <button
+                            aria-label={`Unfollow ${artist.name}`}
+                            className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <UserMinus className="size-3" />
+                          </button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="flex items-center gap-2">
+                              <AlertTriangle className="size-5 text-destructive" /> Unfollow {artist.name}?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will remove {artist.name} and all their releases from your library.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => onUnfollow(artist.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Unfollow
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                </MagicCard>
+              </BlurFade>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
+
+const Panel = ({ icon, title, hint, children }: { icon: React.ReactNode; title: string; hint: string; children: React.ReactNode }) => (
+  <MagicCard
+    className="h-full rounded-2xl"
+    gradientSize={320}
+    gradientColor="hsl(var(--primary) / 0.06)"
+    gradientOpacity={1}
+    gradientFrom="hsl(var(--primary) / 0.8)"
+    gradientTo="hsl(var(--primary) / 0.2)"
+  >
+    <div className="space-y-4 p-5">
+      <div className="flex items-start gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">{icon}</span>
+        <div>
+          <h3 className="text-sm font-medium">{title}</h3>
+          <p className="text-xs text-muted-foreground">{hint}</p>
+        </div>
+      </div>
+      {children}
+    </div>
+  </MagicCard>
+);
 
 export default FollowedArtists;

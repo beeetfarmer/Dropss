@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { Save, Loader2, Music, Bell, Radio, Server, Clock, Eye, EyeOff, Send, KeyRound, Copy, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
-import AnimatedBackground from "@/components/AnimatedBackground";
-import Header from "@/components/Header";
+import AppShell from "@/components/AppShell";
+import { MagicCard } from "@/components/ui/magic-card";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { ShimmerButton } from "@/components/ui/shimmer-button";
+import { cn } from "@/lib/utils";
 import { useSettings, useUpdateSettings, useApiKeys, useCreateApiKey, useRevokeApiKey } from "@/hooks/use-api";
 import { integrationAPI } from "@/services/api";
 import type { ApiSettingsUpdate, ApiKeyScope } from "@/types/music";
@@ -33,7 +35,7 @@ interface SectionConfig {
 const sections: SectionConfig[] = [
   {
     title: "Spotify",
-    icon: <Music className="h-5 w-5 text-green-400" />,
+    icon: <Music className="size-4" />,
     description: "Spotify API credentials for artist search and release tracking",
     fields: [
       { key: "spotify_client_id", label: "Client ID", placeholder: "Your Spotify Client ID" },
@@ -42,7 +44,7 @@ const sections: SectionConfig[] = [
   },
   {
     title: "Last.fm",
-    icon: <Radio className="h-5 w-5 text-red-400" />,
+    icon: <Radio className="size-4" />,
     description: "Import your top artists from Last.fm",
     fields: [
       { key: "lastfm_api_key", label: "API Key", placeholder: "Set via environment", type: "password", envOnly: true },
@@ -51,7 +53,7 @@ const sections: SectionConfig[] = [
   },
   {
     title: "Jellyfin",
-    icon: <Server className="h-5 w-5 text-purple-400" />,
+    icon: <Server className="size-4" />,
     description: "Check releases against your Jellyfin library",
     fields: [
       { key: "jellyfin_url", label: "Server URL", placeholder: "http://your-jellyfin:8096" },
@@ -60,7 +62,7 @@ const sections: SectionConfig[] = [
   },
   {
     title: "Plex",
-    icon: <Server className="h-5 w-5 text-yellow-400" />,
+    icon: <Server className="size-4" />,
     description: "Check releases against your Plex library",
     fields: [
       { key: "plex_url", label: "Server URL", placeholder: "http://your-plex:32400" },
@@ -69,7 +71,7 @@ const sections: SectionConfig[] = [
   },
   {
     title: "Navidrome",
-    icon: <Server className="h-5 w-5 text-orange-400" />,
+    icon: <Server className="size-4" />,
     description: "Check releases against your Navidrome library (Subsonic API)",
     fields: [
       { key: "navidrome_url", label: "Server URL", placeholder: "http://your-navidrome:4533" },
@@ -79,7 +81,7 @@ const sections: SectionConfig[] = [
   },
   {
     title: "Gotify",
-    icon: <Bell className="h-5 w-5 text-blue-400" />,
+    icon: <Bell className="size-4" />,
     description: "Push notifications via Gotify",
     fields: [
       { key: "gotify_url", label: "Server URL", placeholder: "http://your-gotify:8080" },
@@ -90,7 +92,7 @@ const sections: SectionConfig[] = [
   },
   {
     title: "Ntfy",
-    icon: <Bell className="h-5 w-5 text-emerald-400" />,
+    icon: <Bell className="size-4" />,
     description: "Push notifications via ntfy",
     fields: [
       { key: "ntfy_url", label: "Server URL", placeholder: "https://ntfy.sh" },
@@ -103,7 +105,7 @@ const sections: SectionConfig[] = [
   },
   {
     title: "Telegram",
-    icon: <Bell className="h-5 w-5 text-sky-400" />,
+    icon: <Bell className="size-4" />,
     description: "Push notifications via a Telegram bot",
     fields: [
       { key: "telegram_bot_token", label: "Bot Token", placeholder: "Set via environment", type: "password", envOnly: true },
@@ -114,7 +116,7 @@ const sections: SectionConfig[] = [
   },
   {
     title: "Application",
-    icon: <Clock className="h-5 w-5 text-primary" />,
+    icon: <Clock className="size-4" />,
     description: "General application settings",
     fields: [
       { key: "release_check_time", label: "Release Check Time", placeholder: "09:00 (24-hour format)" },
@@ -139,7 +141,6 @@ const Settings = () => {
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [visibleSecrets, setVisibleSecrets] = useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = useState("");
   const [testingSection, setTestingSection] = useState<string | null>(null);
   const [apiKeyName, setApiKeyName] = useState("");
   const [apiKeyScopes, setApiKeyScopes] = useState<Set<ApiKeyScope>>(new Set<ApiKeyScope>(["read"]));
@@ -284,259 +285,307 @@ const Settings = () => {
     });
   };
 
+  const slug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const inputCls = "h-10 rounded-xl border-white/[0.07] bg-white/[0.03] font-mono text-sm focus-visible:border-primary/40 focus-visible:ring-0 disabled:opacity-60";
+  const navItems = [...sections.map((s) => s.title), "API Keys"];
+
   return (
-    <div className="min-h-screen bg-background relative">
-      <AnimatedBackground />
-      <div className="relative z-10">
-        <Header searchQuery={searchQuery} onSearchChange={setSearchQuery} />
+    <AppShell>
+      <section className="container pt-10 pb-8 sm:pt-16">
+        <BlurFade>
+          <p className="mb-3 text-[11px] font-medium tracking-[0.25em] text-primary uppercase">Preferences</p>
+          <h1 className="font-serif text-5xl leading-[0.95] tracking-tight sm:text-7xl">Settings</h1>
+          <p className="mt-4 max-w-md text-sm text-muted-foreground">
+            Configure integrations and application preferences.
+            {settings?.app_version && <span className="ml-2 rounded-full bg-white/[0.05] px-2 py-0.5 font-mono text-[11px]">v{settings.app_version}</span>}
+          </p>
+        </BlurFade>
+      </section>
 
-        <main className="container mx-auto px-4 py-6 max-w-3xl">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-xl font-bold">Settings</h2>
-              <p className="text-sm text-muted-foreground">Configure integrations and application preferences</p>
-              {settings?.app_version && (
-                <p className="text-xs text-muted-foreground/70 mt-1 font-mono">v{settings.app_version}</p>
-              )}
-            </div>
-            <Button
-              onClick={handleSave}
-              disabled={dirty.size === 0 || updateSettings.isPending}
-              className="gap-1.5"
-            >
-              {updateSettings.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              Save Changes
-              {dirty.size > 0 && (
-                <span className="ml-1 bg-primary-foreground/20 px-1.5 py-0.5 rounded text-[10px] font-mono">
-                  {dirty.size}
-                </span>
-              )}
-            </Button>
-          </div>
-
-          {isLoading ? (
-            <div className="space-y-6">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-40 rounded-lg" />
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {sections.map((section, i) => (
-                <motion.div
-                  key={section.title}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="glass-card p-5 space-y-4"
-                >
-                  <div className="flex items-center gap-3">
-                    {section.icon}
-                    <div>
-                      <h3 className="text-sm font-semibold">{section.title}</h3>
-                      <p className="text-[11px] text-muted-foreground">{section.description}</p>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3">
-                    {section.fields.map((field) => {
-                      const isSecret = field.type === "password";
-                      const isVisible = visibleSecrets.has(field.key);
-                      const isDirty = dirty.has(field.key);
-
-                      return (
-                        <div key={field.key} className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground flex items-center gap-2">
-                            {field.label}
-                            {field.envOnly && <span className="text-[10px] text-muted-foreground">(env-only)</span>}
-                            {isDirty && <span className="text-primary text-[10px]">(modified)</span>}
-                          </Label>
-                          <div className="relative">
-                            <Input
-                              type={isSecret && !isVisible ? "password" : field.type === "number" ? "number" : "text"}
-                              value={formData[field.key] ?? ""}
-                              onChange={(e) => handleChange(field.key, e.target.value)}
-                              placeholder={field.placeholder}
-                              disabled={field.envOnly}
-                              className={`bg-secondary/50 border-border h-9 text-sm font-mono ${isSecret ? "pr-10" : ""} ${isDirty ? "border-primary/50" : ""}`}
-                            />
-                            {isSecret && (
-                              <button
-                                type="button"
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                onClick={() => toggleSecret(field.key)}
-                              >
-                                {isVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {section.testAction && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5"
-                      disabled={testingSection === section.title}
-                      onClick={() => handleTest(section)}
-                    >
-                      {testingSection === section.title ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Send className="h-3.5 w-3.5" />
-                      )}
-                      {section.testLabel}
-                    </Button>
-                  )}
-                </motion.div>
-              ))}
-
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: sections.length * 0.05 }}
-                className="glass-card p-5 space-y-4"
-              >
-                <div className="flex items-center gap-3">
-                  <KeyRound className="h-5 w-5 text-cyan-400" />
-                  <div>
-                    <h3 className="text-sm font-semibold">API Keys</h3>
-                    <p className="text-[11px] text-muted-foreground">
-                      Machine credentials for external apps. Raw keys are shown only once.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">Key Name</Label>
-                    <Input
-                      value={apiKeyName}
-                      onChange={(e) => setApiKeyName(e.target.value)}
-                      placeholder="Example: HomeAssistant read key"
-                      className="bg-secondary/50 border-border h-9 text-sm font-mono"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Scopes</Label>
-                    <div className="grid gap-2 sm:grid-cols-3">
-                      {API_KEY_SCOPE_OPTIONS.map((option) => (
-                        <label
-                          key={option.scope}
-                          className="flex items-start gap-2 rounded border border-border/60 bg-secondary/30 px-3 py-2 text-xs"
-                        >
-                          <Checkbox
-                            checked={apiKeyScopes.has(option.scope)}
-                            onCheckedChange={(checked) => toggleApiKeyScope(option.scope, checked === true)}
-                          />
-                          <span>
-                            <span className="block font-medium">{option.label}</span>
-                            <span className="text-muted-foreground">{option.description}</span>
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">Expiry (days, optional)</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={apiKeyExpiryDays}
-                      onChange={(e) => setApiKeyExpiryDays(e.target.value)}
-                      placeholder="90"
-                      className="bg-secondary/50 border-border h-9 text-sm font-mono"
-                    />
-                  </div>
-
-                  <Button
-                    onClick={handleCreateApiKey}
-                    disabled={createApiKey.isPending}
-                    className="w-fit gap-1.5"
+      <main className="container grid gap-10 lg:grid-cols-[200px_minmax(0,1fr)]">
+        <nav className="hidden lg:block">
+          <ul className="sticky top-6 space-y-0.5">
+            {navItems.map((title, i) => (
+              <BlurFade key={title} delay={i * 0.03} direction="right" offset={6}>
+                <li>
+                  <a
+                    href={`#${slug(title)}`}
+                    className="block rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-foreground"
                   >
-                    {createApiKey.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <KeyRound className="h-4 w-4" />
-                    )}
-                    Create API Key
-                  </Button>
+                    {title}
+                  </a>
+                </li>
+              </BlurFade>
+            ))}
+          </ul>
+        </nav>
 
-                  {latestCreatedApiKey && (
-                    <div className="rounded border border-emerald-500/30 bg-emerald-500/10 p-3 space-y-2">
-                      <p className="text-xs text-emerald-300">
-                        New key (copy now, it cannot be retrieved later):
-                      </p>
-                      <code className="block text-[11px] break-all font-mono text-emerald-200">
-                        {latestCreatedApiKey}
-                      </code>
-                      <Button variant="outline" size="sm" className="gap-1.5" onClick={copyLatestApiKey}>
-                        <Copy className="h-3.5 w-3.5" />
-                        Copy Key
+        <div className="max-w-3xl space-y-4">
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="surface h-44 animate-pulse" style={{ animationDelay: `${i * 80}ms` }} />
+            ))
+          ) : (
+            <>
+              {sections.map((section, i) => (
+                <BlurFade key={section.title} inView delay={Math.min(i, 4) * 0.05} offset={10} direction="up">
+                  <SettingsCard id={slug(section.title)} icon={section.icon} title={section.title} description={section.description}>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {section.fields.map((field) => {
+                        const isSecret = field.type === "password";
+                        const isVisible = visibleSecrets.has(field.key);
+                        const isDirty = dirty.has(field.key);
+
+                        return (
+                          <div key={field.key} className="space-y-1.5">
+                            <Label htmlFor={field.key} className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
+                              {field.label}
+                              {field.envOnly && <span className="rounded-full bg-white/[0.05] px-1.5 py-px text-[9px] tracking-wider uppercase">env</span>}
+                              <AnimatePresence>
+                                {isDirty && (
+                                  <motion.span
+                                    initial={{ opacity: 0, scale: 0.6 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.6 }}
+                                    className="size-1.5 rounded-full bg-primary shadow-[0_0_8px] shadow-primary"
+                                    title="Modified"
+                                  />
+                                )}
+                              </AnimatePresence>
+                            </Label>
+                            <div className="relative">
+                              <Input
+                                id={field.key}
+                                type={isSecret && !isVisible ? "password" : field.type === "number" ? "number" : "text"}
+                                value={formData[field.key] ?? ""}
+                                onChange={(e) => handleChange(field.key, e.target.value)}
+                                placeholder={field.placeholder}
+                                disabled={field.envOnly}
+                                className={cn(inputCls, isSecret && "pr-10", isDirty && "border-primary/40")}
+                              />
+                              {isSecret && (
+                                <button
+                                  type="button"
+                                  aria-label={isVisible ? "Hide value" : "Show value"}
+                                  className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                                  onClick={() => toggleSecret(field.key)}
+                                >
+                                  {isVisible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {section.testAction && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 rounded-full"
+                        disabled={testingSection === section.title}
+                        onClick={() => handleTest(section)}
+                      >
+                        {testingSection === section.title ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+                        {section.testLabel}
+                      </Button>
+                    )}
+                  </SettingsCard>
+                </BlurFade>
+              ))}
+
+              <BlurFade inView offset={10} direction="up">
+                <SettingsCard
+                  id="api-keys"
+                  icon={<KeyRound className="size-4" />}
+                  title="API Keys"
+                  description="Machine credentials for external apps. Raw keys are shown only once."
+                >
+                  <div className="grid gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="api-key-name" className="text-xs font-normal text-muted-foreground">Key name</Label>
+                      <Input
+                        id="api-key-name"
+                        value={apiKeyName}
+                        onChange={(e) => setApiKeyName(e.target.value)}
+                        placeholder="Example: HomeAssistant read key"
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs font-normal text-muted-foreground">Scopes</Label>
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        {API_KEY_SCOPE_OPTIONS.map((option) => {
+                          const on = apiKeyScopes.has(option.scope);
+                          return (
+                            <label
+                              key={option.scope}
+                              className={cn(
+                                "flex cursor-pointer items-start gap-2.5 rounded-xl border px-3 py-2.5 text-xs transition-colors",
+                                on ? "border-primary/40 bg-primary/[0.07]" : "border-white/[0.07] bg-white/[0.02] hover:border-white/[0.14]",
+                              )}
+                            >
+                              <Checkbox
+                                checked={on}
+                                onCheckedChange={(checked) => toggleApiKeyScope(option.scope, checked === true)}
+                                className="mt-0.5"
+                              />
+                              <span>
+                                <span className="block font-medium">{option.label}</span>
+                                <span className="text-muted-foreground">{option.description}</span>
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-end gap-3">
+                      <div className="w-40 space-y-1.5">
+                        <Label htmlFor="api-key-expiry" className="text-xs font-normal text-muted-foreground">Expiry (days, optional)</Label>
+                        <Input
+                          id="api-key-expiry"
+                          type="number"
+                          min={1}
+                          value={apiKeyExpiryDays}
+                          onChange={(e) => setApiKeyExpiryDays(e.target.value)}
+                          placeholder="90"
+                          className={inputCls}
+                        />
+                      </div>
+                      <Button onClick={handleCreateApiKey} disabled={createApiKey.isPending} className="h-10 gap-1.5 rounded-xl">
+                        {createApiKey.isPending ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
+                        Create API key
                       </Button>
                     </div>
-                  )}
-                </div>
 
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Existing Keys</h4>
-                  {apiKeysLoading ? (
-                    <Skeleton className="h-24 rounded-lg" />
-                  ) : (apiKeys?.items.length ?? 0) === 0 ? (
-                    <p className="text-xs text-muted-foreground">No API keys created yet.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {apiKeys?.items.map((item) => (
-                        <div
-                          key={item.key_id}
-                          className="rounded border border-border/60 bg-secondary/30 px-3 py-2 text-xs space-y-1.5"
+                    <AnimatePresence>
+                      {latestCreatedApiKey && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="overflow-hidden"
                         >
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <p className="font-medium text-sm">{item.name}</p>
-                              <p className="text-muted-foreground font-mono">{item.key_prefix}...</p>
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1.5"
-                              disabled={!item.is_active || revokeApiKey.isPending}
-                              onClick={() => handleRevokeApiKey(item.key_id)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              Revoke
+                          <div className="space-y-2.5 rounded-xl border border-status-available/30 bg-status-available/[0.07] p-3.5">
+                            <p className="text-xs text-status-available">New key — copy it now, it cannot be retrieved later:</p>
+                            <code className="block rounded-lg bg-black/40 p-2.5 font-mono text-[11px] break-all">{latestCreatedApiKey}</code>
+                            <Button variant="outline" size="sm" className="gap-1.5 rounded-full" onClick={copyLatestApiKey}>
+                              <Copy className="size-3.5" /> Copy key
                             </Button>
                           </div>
-                          <p className="text-muted-foreground">
-                            Scopes: {item.scopes.join(", ")} | Created: {formatTimestamp(item.created_at)}
-                          </p>
-                          <p className="text-muted-foreground">
-                            Last used: {formatTimestamp(item.last_used_at)} | Expires: {item.expires_at ? formatTimestamp(item.expires_at) : "Never"}
-                          </p>
-                          <p className={item.is_active ? "text-emerald-300" : "text-amber-300"}>
-                            {item.is_active ? "Active" : item.revoked_at ? "Revoked" : "Expired"}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  <div className="space-y-2 border-t border-white/[0.06] pt-5">
+                    <h4 className="text-[11px] font-medium tracking-widest text-muted-foreground uppercase">Existing keys</h4>
+                    {apiKeysLoading ? (
+                      <div className="h-24 animate-pulse rounded-xl bg-white/[0.03]" />
+                    ) : (apiKeys?.items.length ?? 0) === 0 ? (
+                      <p className="text-xs text-muted-foreground">No API keys created yet.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {apiKeys?.items.map((item) => (
+                          <div key={item.key_id} className="space-y-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-3 text-xs">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="flex items-center gap-2 text-sm font-medium">
+                                  <span className="truncate">{item.name}</span>
+                                  <span
+                                    className={cn(
+                                      "shrink-0 rounded-full px-2 py-px text-[10px] font-normal",
+                                      item.is_active ? "bg-status-available/10 text-status-available" : "bg-status-partial/10 text-status-partial",
+                                    )}
+                                  >
+                                    {item.is_active ? "Active" : item.revoked_at ? "Revoked" : "Expired"}
+                                  </span>
+                                </p>
+                                <p className="font-mono text-muted-foreground">{item.key_prefix}…</p>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1.5 rounded-full hover:border-destructive/40 hover:text-destructive"
+                                disabled={!item.is_active || revokeApiKey.isPending}
+                                onClick={() => handleRevokeApiKey(item.key_id)}
+                              >
+                                <Trash2 className="size-3.5" /> Revoke
+                              </Button>
+                            </div>
+                            <div className="grid gap-x-4 gap-y-0.5 text-muted-foreground sm:grid-cols-2">
+                              <p>Scopes: <span className="text-foreground/80">{item.scopes.join(", ")}</span></p>
+                              <p>Created: {formatTimestamp(item.created_at)}</p>
+                              <p>Last used: {formatTimestamp(item.last_used_at)}</p>
+                              <p>Expires: {item.expires_at ? formatTimestamp(item.expires_at) : "Never"}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </SettingsCard>
+              </BlurFade>
+            </>
           )}
-        </main>
-      </div>
-    </div>
+        </div>
+      </main>
+
+      <AnimatePresence>
+        {(dirty.size > 0 || updateSettings.isPending) && (
+          <motion.div
+            initial={{ y: 40, opacity: 0, filter: "blur(6px)" }}
+            animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+            exit={{ y: 40, opacity: 0, filter: "blur(6px)" }}
+            transition={{ type: "spring", stiffness: 380, damping: 30 }}
+            className="fixed inset-x-0 bottom-24 z-40 flex justify-center px-4"
+          >
+            <div className="flex items-center gap-4 rounded-full border border-white/[0.08] bg-[#111114]/95 py-1.5 pr-1.5 pl-5 shadow-2xl shadow-black/60">
+              <span className="text-sm text-muted-foreground">
+                <span className="font-mono text-foreground">{dirty.size}</span> unsaved change{dirty.size !== 1 ? "s" : ""}
+              </span>
+              <ShimmerButton
+                onClick={handleSave}
+                disabled={dirty.size === 0 || updateSettings.isPending}
+                background="hsl(var(--primary))"
+                shimmerColor="#ffffff"
+                shimmerDuration="2.5s"
+                className="h-9 gap-1.5 border-0 px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+              >
+                {updateSettings.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                Save changes
+              </ShimmerButton>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </AppShell>
   );
 };
+
+const SettingsCard = ({ id, icon, title, description, children }: { id: string; icon: React.ReactNode; title: string; description: string; children: React.ReactNode }) => (
+  <MagicCard
+    className="scroll-mt-6 rounded-2xl"
+    gradientSize={360}
+    gradientColor="hsl(var(--primary) / 0.05)"
+    gradientOpacity={1}
+    gradientFrom="hsl(var(--primary) / 0.7)"
+    gradientTo="hsl(var(--primary) / 0.15)"
+  >
+    <div id={id} className="scroll-mt-6 space-y-5 p-5 sm:p-6">
+      <div className="flex items-start gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">{icon}</span>
+        <div>
+          <h3 className="text-sm font-medium">{title}</h3>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      {children}
+    </div>
+  </MagicCard>
+);
 
 export default Settings;
