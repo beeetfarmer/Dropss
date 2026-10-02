@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { artistAPI, releaseAPI, integrationAPI, settingsAPI } from "@/services/api";
+import { artistAPI, releaseAPI, integrationAPI, settingsAPI, spotifyAccountAPI } from "@/services/api";
 import { transformRelease, transformArtist, transformSearchArtist } from "@/lib/transformers";
 import type {
   Release,
@@ -25,6 +25,8 @@ const keys = {
   integrationHealth: ["integrations", "health"] as const,
   settings: ["settings"] as const,
   apiKeys: ["settings", "api-keys"] as const,
+  spotifyAccount: ["spotify", "account"] as const,
+  spotifyPlaylists: ["spotify", "playlists"] as const,
 };
 
 export function useLatestReleases() {
@@ -261,3 +263,30 @@ export function useRevokeApiKey() {
     },
   });
 }
+
+export function useSpotifyAccount() {
+  return useQuery({ queryKey: keys.spotifyAccount, queryFn: () => spotifyAccountAPI.get() });
+}
+
+export function useSpotifyPlaylists(enabled: boolean) {
+  return useQuery({
+    queryKey: keys.spotifyPlaylists,
+    queryFn: () => spotifyAccountAPI.playlists().then((r) => r.items),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+function useSpotifyMutation<TArg, TResult>(fn: (arg: TArg) => Promise<TResult>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["spotify"] }),
+  });
+}
+
+export const useSpotifyConnect = () => useMutation({ mutationFn: spotifyAccountAPI.connect });
+export const useSpotifyDisconnect = () => useSpotifyMutation(() => spotifyAccountAPI.disconnect());
+export const useSpotifyCreatePlaylist = () => useSpotifyMutation(spotifyAccountAPI.createPlaylist);
+export const useSpotifySelectPlaylist = () => useSpotifyMutation(spotifyAccountAPI.selectPlaylist);
+export const useSpotifyPlaylistTypes = () => useSpotifyMutation(spotifyAccountAPI.setPlaylistTypes);

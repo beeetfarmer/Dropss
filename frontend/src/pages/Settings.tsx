@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import AppShell from "@/components/AppShell";
+import SpotifyPlaylistSync from "@/components/SpotifyPlaylistSync";
+import { useSearchParams } from "react-router-dom";
 import { MagicCard } from "@/components/ui/magic-card";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
@@ -32,6 +34,7 @@ interface SectionConfig {
   testLabel?: string;
   service?: IntegrationName;
   hint?: string;
+  extra?: React.ReactNode;
 }
 
 const sections: SectionConfig[] = [
@@ -44,6 +47,7 @@ const sections: SectionConfig[] = [
       { key: "spotify_client_id", label: "Client ID", placeholder: "Your Spotify Client ID" },
       { key: "spotify_client_secret", label: "Client Secret", placeholder: "Set via environment", type: "password", envOnly: true },
     ],
+    extra: <SpotifyPlaylistSync />,
   },
   {
     title: "Last.fm",
@@ -190,6 +194,23 @@ const Settings = () => {
   const createApiKey = useCreateApiKey();
   const revokeApiKey = useRevokeApiKey();
   const [formData, setFormData] = useState<Record<string, string>>({});
+  const [params, setParams] = useSearchParams();
+
+  // Result of the Spotify OAuth round trip (see /spotify/callback).
+  useEffect(() => {
+    const result = params.get("spotify");
+    if (!result) return;
+    const messages: Record<string, [string, "success" | "error"]> = {
+      connected: ["Spotify account connected. Now pick a playlist.", "success"],
+      denied: ["Spotify sign-in was cancelled.", "error"],
+      invalid: ["Spotify sign-in link expired. Please try again.", "error"],
+      error: ["Spotify sign-in failed. Check the redirect URI in your Spotify app.", "error"],
+    };
+    const [text, kind] = messages[result] ?? messages.error;
+    toast[kind](text);
+    setParams({}, { replace: true });
+    setTimeout(() => document.getElementById("music-sources")?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
+  }, [params, setParams]);
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [visibleSecrets, setVisibleSecrets] = useState<Set<string>>(new Set());
   const [testingSection, setTestingSection] = useState<string | null>(null);
@@ -405,6 +426,8 @@ const Settings = () => {
           {section.testLabel}
         </Button>
       )}
+
+      {section.extra}
     </>
   );
 

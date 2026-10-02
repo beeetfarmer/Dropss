@@ -1,5 +1,6 @@
 from ..config import get_settings
 from .apprise_service import AppriseService
+from .spotify_account_service import SpotifyPlaylistSync, get_account
 from .gotify_service import GotifyService
 from .ntfy_service import NtfyService
 from .telegram_service import TelegramService
@@ -16,6 +17,9 @@ def configured_notifiers() -> list:
         notifiers.append(TelegramService())
     if settings.apprise_urls:
         notifiers.append(AppriseService())
+    if settings.spotify_playlist_id and get_account():
+        types = {t.strip() for t in settings.spotify_playlist_types.split(",") if t.strip()}
+        notifiers.append(SpotifyPlaylistSync(settings.spotify_playlist_id, types))
     return notifiers
 
 

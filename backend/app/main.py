@@ -12,6 +12,7 @@ from .routes import artists_router, releases_router
 from .routes.integrations import router as integrations_router
 from .routes.settings import router as settings_router
 from .routes.auth import router as auth_router
+from .routes.spotify_account import router as spotify_account_router
 from .scheduler import start_scheduler, stop_scheduler
 from .security import verify_csrf_request
 
@@ -79,6 +80,7 @@ app.include_router(artists_router)
 app.include_router(releases_router)
 app.include_router(integrations_router)
 app.include_router(settings_router)
+app.include_router(spotify_account_router)
 
 
 @app.get("/")
