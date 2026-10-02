@@ -4,6 +4,7 @@ import type {
   ApiArtistSearch,
   ApiStats,
   ApiIntegrationStatus,
+  ApiIntegrationHealth,
   ApiLastFmImportResult,
   ApiArtistReleases,
   ApiTrack,
@@ -14,6 +15,9 @@ import type {
   ApiKeyListResponse,
   ApiKeyCreateRequest,
   ApiKeyCreateResponse,
+  ApiSpotifyAccount,
+  ApiSpotifyPlaylist,
+  SpotifyPlaylistType,
 } from "@/types/music";
 
 const getBaseUrl = () => {
@@ -140,6 +144,8 @@ export const releaseAPI = {
 export const integrationAPI = {
   checkStatus: () => apiFetch<ApiIntegrationStatus>("/integrations/status"),
 
+  checkHealth: () => apiFetch<ApiIntegrationHealth>("/integrations/health"),
+
   importLastFm: (period: string, limit: number) =>
     apiFetch<ApiLastFmImportResult>("/integrations/lastfm/import", {
       method: "POST",
@@ -172,6 +178,38 @@ export const integrationAPI = {
 
   testTelegram: () =>
     apiFetch<{ success: boolean; message: string }>("/integrations/telegram/test", { method: "POST" }),
+
+  testApprise: () =>
+    apiFetch<{ success: boolean; message: string }>("/integrations/apprise/test", { method: "POST" }),
+};
+
+export const spotifyAccountAPI = {
+  get: () => apiFetch<ApiSpotifyAccount>("/spotify/account"),
+
+  connect: (redirectUri: string) =>
+    apiFetch<{ authorize_url: string }>("/spotify/connect", {
+      method: "POST",
+      body: JSON.stringify({ redirect_uri: redirectUri }),
+    }),
+
+  disconnect: () => apiFetch<{ connected: boolean }>("/spotify/account", { method: "DELETE" }),
+
+  playlists: () => apiFetch<{ items: ApiSpotifyPlaylist[] }>("/spotify/playlists"),
+
+  createPlaylist: (name: string) =>
+    apiFetch<ApiSpotifyPlaylist>("/spotify/playlists", { method: "POST", body: JSON.stringify({ name }) }),
+
+  setPlaylistTypes: (types: SpotifyPlaylistType[]) =>
+    apiFetch<{ playlist_types: SpotifyPlaylistType[] }>("/spotify/playlist-types", {
+      method: "PUT",
+      body: JSON.stringify({ types }),
+    }),
+
+  selectPlaylist: (playlistId: string) =>
+    apiFetch<{ playlist_id: string | null }>("/spotify/playlist", {
+      method: "PUT",
+      body: JSON.stringify({ playlist_id: playlistId }),
+    }),
 };
 
 export const settingsAPI = {

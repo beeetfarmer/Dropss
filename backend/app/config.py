@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 from functools import lru_cache
 from .settings_store import load_overrides
 
-APP_VERSION = "0.2.4"
+APP_VERSION = "0.3.0"
 
 
 class Settings(BaseSettings):
@@ -19,6 +19,12 @@ class Settings(BaseSettings):
 
     spotify_client_id: str = ""
     spotify_client_secret: str = ""
+    # Optional: fixes the OAuth redirect URI instead of deriving it from the
+    # browser's origin. Must match one registered in the Spotify dashboard.
+    spotify_redirect_uri: str = ""
+    spotify_playlist_id: str = ""
+    # Release types added to the playlist: "album", "single" (Spotify files EPs as singles).
+    spotify_playlist_types: str = "album,single"
 
     gotify_url: str = ""
     gotify_token: str = ""
@@ -30,6 +36,8 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
+
+    apprise_urls: str = ""
 
     database_url: str = "postgresql+psycopg://dropss:dropss@localhost:5424/dropss"
 
@@ -59,16 +67,17 @@ class Settings(BaseSettings):
 
 SECRET_FIELDS = {
     "spotify_client_secret", "gotify_token", "ntfy_password",
-    "telegram_bot_token",
+    "telegram_bot_token", "apprise_urls",
     "lastfm_api_key", "jellyfin_api_key", "plex_token",
     "navidrome_password",
 }
 
 OVERRIDABLE_FIELDS = {
-    "spotify_client_id", "spotify_client_secret",
+    "spotify_client_id", "spotify_client_secret", "spotify_playlist_id", "spotify_playlist_types",
     "gotify_url", "gotify_token",
     "ntfy_url", "ntfy_topic", "ntfy_username", "ntfy_password",
     "telegram_bot_token", "telegram_chat_id",
+    "apprise_urls",
     "lastfm_api_key", "lastfm_username",
     "jellyfin_url", "jellyfin_api_key",
     "plex_url", "plex_token",

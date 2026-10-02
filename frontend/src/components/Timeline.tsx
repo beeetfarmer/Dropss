@@ -1,7 +1,10 @@
 import { useMemo } from "react";
-import { Calendar, Music, ExternalLink } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ArrowUpRight, Music } from "lucide-react";
+import { BlurFade } from "@/components/ui/blur-fade";
 import { Release, LibraryStatus } from "@/types/music";
+import { TypeBadge } from "@/components/ReleaseCard";
+import { EmptyState } from "@/components/LatestReleases";
+import { cn } from "@/lib/utils";
 
 interface TimelineProps {
   releases: Release[];
@@ -23,22 +26,12 @@ const StatusBadge = ({ status, tracks }: { status: LibraryStatus; tracks: { avai
   }[status];
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${config.className}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${
-        status === "available" ? "bg-status-available" : status === "partial" ? "bg-status-partial" : "bg-status-missing"
-      }`} />
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-medium whitespace-nowrap", config.className)}>
+      <span className={cn("size-1.5 rounded-full", status === "available" ? "bg-status-available" : status === "partial" ? "bg-status-partial" : "bg-status-missing")} />
       {config.label}
     </span>
   );
 };
-
-const TypeBadge = ({ type }: { type: Release["type"] }) => (
-  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider ${
-    type === "album" ? "badge-album" : type === "ep" ? "badge-ep" : "badge-single"
-  }`}>
-    {type}
-  </span>
-);
 
 function getGroupKey(dateStr: string): { groupKey: string; sectionLabel: string } {
   const date = new Date(dateStr + "T00:00:00");
@@ -82,7 +75,7 @@ const Timeline = ({ releases, isLoading, jellyfinAvailable, plexAvailable, navid
       const q = searchQuery.toLowerCase();
       result = result.filter(r => r.name.toLowerCase().includes(q) || r.artistName.toLowerCase().includes(q));
     }
-    return result.sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+    return [...result].sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
   }, [releases, searchQuery]);
 
   const sections = useMemo(() => {
@@ -115,12 +108,12 @@ const Timeline = ({ releases, isLoading, jellyfinAvailable, plexAvailable, navid
 
   if (isLoading) {
     return (
-      <div className="max-w-3xl mx-auto space-y-8">
+      <div className="mx-auto max-w-3xl space-y-10">
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="space-y-3">
-            <Skeleton className="h-6 w-40" />
-            <Skeleton className="h-20 rounded-lg" />
-            <Skeleton className="h-20 rounded-lg" />
+            <div className="h-7 w-40 animate-pulse rounded-lg bg-white/[0.04]" />
+            <div className="surface h-20 animate-pulse" />
+            <div className="surface h-20 animate-pulse" />
           </div>
         ))}
       </div>
@@ -128,96 +121,89 @@ const Timeline = ({ releases, isLoading, jellyfinAvailable, plexAvailable, navid
   }
 
   if (filtered.length === 0) {
-    return (
-      <div className="text-center py-16 text-muted-foreground">
-        <p className="text-sm">No releases match your filters.</p>
-      </div>
-    );
+    return <EmptyState>No releases match your filters.</EmptyState>;
   }
 
   const hasMultipleDates = (section: Section) => section.dateGroups.length > 1;
+  let index = 0;
 
   return (
-    <div className="max-w-3xl mx-auto">
-      {sections.map((section, si) => (
-        <div key={section.groupKey} className="relative">
-          {si < sections.length - 1 && (
-            <div className="absolute left-5 top-12 bottom-0 w-px bg-border" />
-          )}
+    <div className="relative mx-auto max-w-3xl">
+      {/* rail */}
+      <div className="absolute top-3 bottom-0 left-[7px] w-px bg-gradient-to-b from-primary/60 via-white/10 to-transparent sm:left-[9px]" />
 
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-10 h-10 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center flex-shrink-0">
-              <Calendar className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold">{section.sectionLabel}</h3>
-              {!hasMultipleDates(section) && (
-                <p className="text-[11px] text-muted-foreground">{section.dateGroups[0].dateLabel}</p>
-              )}
-            </div>
-          </div>
+      {sections.map((section) => (
+        <section key={section.groupKey} className="relative pb-12 pl-8 sm:pl-12">
+          <span className="absolute top-2.5 left-0 flex size-[15px] items-center justify-center sm:size-[19px]">
+            <span className="absolute inset-0 animate-ping rounded-full bg-primary/20 [animation-duration:3s]" />
+            <span className="absolute inset-0 rounded-full bg-primary/20" />
+            <span className="size-[7px] rounded-full bg-primary shadow-[0_0_12px] shadow-primary" />
+          </span>
+          <BlurFade inView direction="right" offset={10} className="mb-5">
+            <h3 className="font-serif text-3xl tracking-tight">{section.sectionLabel}</h3>
+            {!hasMultipleDates(section) && (
+              <p className="mt-0.5 text-xs text-muted-foreground">{section.dateGroups[0].dateLabel}</p>
+            )}
+          </BlurFade>
 
-          <div className="ml-5 pl-9 border-l border-border pb-8">
-            {section.dateGroups.map((dg, di) => (
-              <div key={dg.date} className={di > 0 ? "mt-5" : ""}>
+          <div className="space-y-6">
+            {section.dateGroups.map((dg) => (
+              <div key={dg.date}>
                 {hasMultipleDates(section) && (
-                  <p className="text-xs font-medium text-muted-foreground mb-2">{dg.dateLabel}</p>
+                  <p className="mb-2.5 text-[11px] font-medium tracking-widest text-muted-foreground uppercase">{dg.dateLabel}</p>
                 )}
 
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {dg.releases.map((release) => {
                     const showJF = jellyfinAvailable && release.jellyfinStatus !== "unchecked";
                     const showPlex = plexAvailable && release.plexStatus !== "unchecked";
                     const showND = navidromeAvailable && release.navidromeStatus !== "unchecked";
+                    const i = index++;
 
                     return (
-                      <a
-                        key={release.id}
-                        href={release.spotifyUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="glass-card-hover flex items-center gap-4 p-3 group cursor-pointer"
-                      >
-                        <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 relative">
-                          {release.coverUrl ? (
-                            <img src={release.coverUrl} alt={release.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full bg-secondary flex items-center justify-center">
-                              <Music className="h-5 w-5 text-muted-foreground" />
+                      <BlurFade key={release.id} inView delay={Math.min(i % 8, 7) * 0.03} offset={8} direction="up">
+                        <a
+                          href={release.spotifyUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="surface group flex items-center gap-4 p-2.5 pr-4 transition-all duration-300 hover:translate-x-1 hover:border-primary/25 hover:bg-card"
+                        >
+                          <div className="relative size-14 shrink-0 overflow-hidden rounded-xl bg-secondary sm:size-16">
+                            {release.coverUrl ? (
+                              <img src={release.coverUrl} alt={release.name} loading="lazy" className="size-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                            ) : (
+                              <div className="flex size-full items-center justify-center">
+                                <Music className="size-5 text-muted-foreground" />
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <h4 className="truncate text-sm font-medium">{release.name}</h4>
+                              <TypeBadge type={release.type} />
+                              {release.isNew && <span className="size-1.5 shrink-0 rounded-full bg-badge-new shadow-[0_0_8px] shadow-badge-new" title="New" />}
                             </div>
-                          )}
-                          <div className="absolute bottom-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <ExternalLink className="h-3 w-3 text-white drop-shadow-lg" />
+                            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                              {release.artistName} · <span className="font-mono">{release.releaseDate}</span>
+                            </p>
                           </div>
-                        </div>
 
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-sm font-semibold truncate">{release.name}</h4>
-                            <TypeBadge type={release.type} />
+                          <div className="flex shrink-0 flex-col items-end gap-1">
+                            {showJF && <StatusBadge status={release.jellyfinStatus} tracks={release.jellyfinTracks} />}
+                            {showPlex && <StatusBadge status={release.plexStatus} tracks={release.plexTracks} />}
+                            {showND && <StatusBadge status={release.navidromeStatus} tracks={release.navidromeTracks} />}
                           </div>
-                          <p className="text-xs text-muted-foreground truncate mt-0.5">{release.artistName} · <span className="font-mono">{release.releaseDate}</span></p>
-                        </div>
-
-                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                          {showJF && (
-                            <StatusBadge status={release.jellyfinStatus} tracks={release.jellyfinTracks} />
-                          )}
-                          {showPlex && (
-                            <StatusBadge status={release.plexStatus} tracks={release.plexTracks} />
-                          )}
-                          {showND && (
-                            <StatusBadge status={release.navidromeStatus} tracks={release.navidromeTracks} />
-                          )}
-                        </div>
-                      </a>
+                          <ArrowUpRight className="hidden size-4 shrink-0 sm:block text-muted-foreground opacity-0 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary group-hover:opacity-100" />
+                        </a>
+                      </BlurFade>
                     );
                   })}
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </section>
       ))}
     </div>
   );

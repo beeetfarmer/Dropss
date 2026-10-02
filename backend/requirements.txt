@@ -1,7 +1,7 @@
 fastapi==0.140.7
 uvicorn[standard]==0.32.0
 sqlalchemy==2.0.23
-spotipy==2.25.2
+spotipy==2.26.0
 python-dotenv==1.2.2
 requests==2.33.0
 httpx==0.27.2
@@ -11,3 +11,5 @@ pydantic-settings==2.6.1
 psycopg[binary]==3.2.13
 alembic==1.13.0
 msgpack>=1.2.1  # transitive; pinned for GHSA-6v7p-g79w-8964 (OOB read)
+apprise==2.0.0
+cryptography==50.0.2

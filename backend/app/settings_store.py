@@ -5,6 +5,7 @@ from pathlib import Path
 DEFAULT_OVERRIDES_FILE = Path(__file__).resolve().parents[2] / "settings_overrides.json"
 SECRET_OVERRIDE_FIELDS = {
     "spotify_client_secret", "gotify_token", "ntfy_password",
+    "telegram_bot_token", "apprise_urls",
     "lastfm_api_key", "jellyfin_api_key", "plex_token",
     "navidrome_password",
 }

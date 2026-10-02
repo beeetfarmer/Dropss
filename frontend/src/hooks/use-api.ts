@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { artistAPI, releaseAPI, integrationAPI, settingsAPI } from "@/services/api";
+import { artistAPI, releaseAPI, integrationAPI, settingsAPI, spotifyAccountAPI } from "@/services/api";
 import { transformRelease, transformArtist, transformSearchArtist } from "@/lib/transformers";
 import type {
   Release,
@@ -22,8 +22,11 @@ const keys = {
   searchArtists: (q: string) => ["artists", "search", q] as const,
   artistReleases: (id: number) => ["artists", id, "releases"] as const,
   integrationStatus: ["integrations", "status"] as const,
+  integrationHealth: ["integrations", "health"] as const,
   settings: ["settings"] as const,
   apiKeys: ["settings", "api-keys"] as const,
+  spotifyAccount: ["spotify", "account"] as const,
+  spotifyPlaylists: ["spotify", "playlists"] as const,
 };
 
 export function useLatestReleases() {
@@ -96,6 +99,14 @@ export function useIntegrationStatus() {
   });
 }
 
+export function useIntegrationHealth() {
+  return useQuery({
+    queryKey: keys.integrationHealth,
+    queryFn: () => integrationAPI.checkHealth(),
+    staleTime: 30_000,
+  });
+}
+
 export function useMarkSeen() {
   const qc = useQueryClient();
   return useMutation({
@@ -149,12 +160,16 @@ export function useRefreshArtist() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (artistId: number) => artistAPI.refresh(artistId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: keys.followedArtists });
-      qc.invalidateQueries({ queryKey: keys.latestReleases });
-      qc.invalidateQueries({ queryKey: keys.allReleases });
-      qc.invalidateQueries({ queryKey: keys.stats });
-    },
+    // Returning the refetches keeps the mutation pending until the refreshed
+    // releases are actually on screen, so loading indicators last that long.
+    onSuccess: (_data, artistId) =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: keys.followedArtists }),
+        qc.invalidateQueries({ queryKey: keys.latestReleases }),
+        qc.invalidateQueries({ queryKey: keys.allReleases }),
+        qc.invalidateQueries({ queryKey: keys.stats }),
+        qc.invalidateQueries({ queryKey: keys.artistReleases(artistId) }),
+      ]),
   });
 }
 
@@ -219,6 +234,7 @@ export function useUpdateSettings() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.settings });
       qc.invalidateQueries({ queryKey: keys.integrationStatus });
+      qc.invalidateQueries({ queryKey: keys.integrationHealth });
     },
   });
 }
@@ -251,3 +267,30 @@ export function useRevokeApiKey() {
     },
   });
 }
+
+export function useSpotifyAccount() {
+  return useQuery({ queryKey: keys.spotifyAccount, queryFn: () => spotifyAccountAPI.get() });
+}
+
+export function useSpotifyPlaylists(enabled: boolean) {
+  return useQuery({
+    queryKey: keys.spotifyPlaylists,
+    queryFn: () => spotifyAccountAPI.playlists().then((r) => r.items),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+function useSpotifyMutation<TArg, TResult>(fn: (arg: TArg) => Promise<TResult>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["spotify"] }),
+  });
+}
+
+export const useSpotifyConnect = () => useMutation({ mutationFn: spotifyAccountAPI.connect });
+export const useSpotifyDisconnect = () => useSpotifyMutation(() => spotifyAccountAPI.disconnect());
+export const useSpotifyCreatePlaylist = () => useSpotifyMutation(spotifyAccountAPI.createPlaylist);
+export const useSpotifySelectPlaylist = () => useSpotifyMutation(spotifyAccountAPI.selectPlaylist);
+export const useSpotifyPlaylistTypes = () => useSpotifyMutation(spotifyAccountAPI.setPlaylistTypes);

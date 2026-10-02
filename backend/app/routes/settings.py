@@ -38,6 +38,7 @@ class SettingsUpdate(BaseModel):
     ntfy_password: Optional[str] = None
     telegram_bot_token: Optional[str] = None
     telegram_chat_id: Optional[str] = None
+    apprise_urls: Optional[str] = None
     lastfm_api_key: Optional[str] = None
     lastfm_username: Optional[str] = None
     jellyfin_url: Optional[str] = None
@@ -59,9 +60,15 @@ class ApiKeyCreateRequest(BaseModel):
 
 
 def _mask_secret(value: str) -> str:
-    if not value or len(value) <= 8:
-        return "****" if value else ""
-    return f"{value[:4]}{'*' * (len(value) - 8)}{value[-4:]}"
+    # Reveal at most the last 4 characters, and only of long secrets, so the
+    # masked value is enough to tell keys apart but never meaningfully narrows
+    # a brute force. Apprise URLs are masked wholesale: their prefix is a scheme
+    # and the tail is usually part of a token.
+    if not value:
+        return ""
+    if len(value) < 20 or "://" in value:
+        return "•" * 12
+    return f"{'•' * 12}{value[-4:]}"
 
 
 APP_DEFAULTS = {
@@ -97,6 +104,7 @@ async def get_settings_endpoint(_: None = Depends(rate_limit(max_requests=60, wi
         "gotify_url", "gotify_token",
         "ntfy_url", "ntfy_topic", "ntfy_username", "ntfy_password",
         "telegram_bot_token", "telegram_chat_id",
+        "apprise_urls",
         "lastfm_api_key", "lastfm_username",
         "jellyfin_url", "jellyfin_api_key",
         "plex_url", "plex_token",

@@ -137,10 +137,38 @@ export interface ApiIntegrationStatus {
   gotify_configured: boolean;
   ntfy_configured: boolean;
   telegram_configured: boolean;
+  apprise_configured: boolean;
   spotify_configured: boolean;
   lastfm_configured: boolean;
   errors: string[];
 }
+
+export type IntegrationHealth = "ok" | "error" | "unconfigured";
+export type IntegrationName =
+  | "spotify" | "lastfm" | "jellyfin" | "plex" | "navidrome"
+  | "gotify" | "ntfy" | "telegram" | "apprise";
+export type ApiIntegrationHealth = Record<IntegrationName, IntegrationHealth>;
+
+export interface ApiSpotifyPlaylist {
+  id: string;
+  name: string;
+  url: string;
+  image_url: string | null;
+  owner_id: string | null;
+  collaborative: boolean;
+}
+
+export interface ApiSpotifyAccount {
+  credentials_configured: boolean;
+  fixed_redirect_uri: string | null;
+  connected: boolean;
+  display_name: string | null;
+  connected_at: string | null;
+  playlist: ApiSpotifyPlaylist | null;
+  playlist_types: SpotifyPlaylistType[];
+}
+
+export type SpotifyPlaylistType = "album" | "single";
 
 export interface ApiLastFmImportResult {
   total_artists: number;

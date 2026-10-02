@@ -1,11 +1,10 @@
 import { useState, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { CheckCheck, ChevronDown, Server, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Skeleton } from "@/components/ui/skeleton";
+import { motion, AnimatePresence } from "motion/react";
+import { Check, CheckCheck, ChevronDown, Server } from "lucide-react";
+import { BlurFade } from "@/components/ui/blur-fade";
 import { Release, ReleaseType } from "@/types/music";
 import ReleaseCard from "@/components/ReleaseCard";
+import { cn } from "@/lib/utils";
 
 interface LatestReleasesProps {
   releases: Release[];
@@ -23,7 +22,79 @@ interface LatestReleasesProps {
 
 const typeOrder: ReleaseType[] = ["album", "ep", "single"];
 const typeLabels: Record<ReleaseType, string> = { album: "Albums", ep: "EPs", single: "Singles" };
-const typeBadgeClass: Record<ReleaseType, string> = { album: "badge-album", ep: "badge-ep", single: "badge-single" };
+const typeColor: Record<ReleaseType, string> = { album: "bg-badge-album", ep: "bg-badge-ep", single: "bg-badge-single" };
+
+export const RELEASE_GRID = "grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7";
+
+export const ActionPill = ({ children, onClick, disabled }: { children: React.ReactNode; onClick: () => void; disabled?: boolean }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/[0.07] bg-white/[0.03] px-3.5 text-xs font-medium transition-all hover:border-white/[0.14] hover:bg-white/[0.06] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-3.5 [&_svg]:text-muted-foreground"
+  >
+    {children}
+  </button>
+);
+
+const FilterChip = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) => (
+  <button
+    role="checkbox"
+    aria-checked={checked}
+    onClick={() => onChange(!checked)}
+    className={cn(
+      "relative inline-flex h-8 items-center gap-1.5 overflow-hidden rounded-full px-3.5 text-xs transition-colors",
+      checked ? "text-primary" : "text-muted-foreground hover:text-foreground",
+    )}
+  >
+    <span
+      className={cn(
+        "absolute inset-0 rounded-full border transition-all duration-300",
+        checked ? "border-primary/40 bg-primary/10" : "border-dashed border-white/10",
+      )}
+    />
+    <AnimatePresence initial={false}>
+      {checked && (
+        <motion.span
+          initial={{ width: 0, opacity: 0 }}
+          animate={{ width: "auto", opacity: 1 }}
+          exit={{ width: 0, opacity: 0 }}
+          className="relative overflow-hidden"
+        >
+          <Check className="size-3" />
+        </motion.span>
+      )}
+    </AnimatePresence>
+    <span className="relative">{label}</span>
+  </button>
+);
+
+export const SkeletonGrid = ({ count = 12 }: { count?: number }) => (
+  <div className={RELEASE_GRID}>
+    {Array.from({ length: count }).map((_, i) => (
+      <div key={i} className="surface animate-pulse p-2" style={{ animationDelay: `${i * 60}ms` }}>
+        <div className="aspect-square rounded-xl bg-white/[0.04]" />
+        <div className="mt-3 h-3 w-3/4 rounded bg-white/[0.04]" />
+        <div className="mt-2 mb-1 h-2.5 w-1/2 rounded bg-white/[0.03]" />
+      </div>
+    ))}
+  </div>
+);
+
+export const EmptyState = ({ children }: { children: React.ReactNode }) => (
+  <BlurFade className="surface flex flex-col items-center justify-center border-dashed py-20 text-center">
+    <p className="font-serif text-2xl italic text-muted-foreground">Nothing here.</p>
+    <p className="mt-1 text-sm text-muted-foreground/70">{children}</p>
+  </BlurFade>
+);
+
+export const SectionToggle = ({ label, count, collapsed, onClick, dotClass }: { label: string; count: number; collapsed: boolean; onClick: () => void; dotClass: string }) => (
+  <button onClick={onClick} aria-expanded={!collapsed} className="group mb-4 flex items-center gap-3">
+    <span className={cn("size-2 rounded-full", dotClass)} />
+    <span className="font-serif text-2xl tracking-tight sm:text-3xl">{label}</span>
+    <span className="rounded-full bg-white/[0.05] px-2 py-0.5 font-mono text-[11px] text-muted-foreground">{count}</span>
+    <ChevronDown className={cn("size-4 text-muted-foreground transition-transform duration-300 group-hover:text-foreground", collapsed && "-rotate-90")} />
+  </button>
+);
 
 const LatestReleases = ({
   releases,
@@ -55,134 +126,83 @@ const LatestReleases = ({
     if (notInJF) result = result.filter(r => r.jellyfinStatus !== "available" && r.jellyfinStatus !== "unchecked");
     if (notInPlex) result = result.filter(r => r.plexStatus !== "available" && r.plexStatus !== "unchecked");
     if (notInND) result = result.filter(r => r.navidromeStatus !== "available" && r.navidromeStatus !== "unchecked");
-    return result.sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+    return [...result].sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
   }, [releases, searchQuery, onlyNew, notInJF, notInPlex, notInND]);
 
   const grouped = useMemo(() => {
-    if (!groupByType) return { all: filtered };
     const groups: Partial<Record<ReleaseType, Release[]>> = {};
-    for (const r of filtered) {
-      (groups[r.type] ??= []).push(r);
-    }
+    for (const r of filtered) (groups[r.type] ??= []).push(r);
     return groups;
-  }, [filtered, groupByType]);
+  }, [filtered]);
 
   const toggleGroup = (type: ReleaseType) => {
     setCollapsedGroups(prev => {
       const next = new Set(prev);
-      if (next.has(type)) {
-        next.delete(type);
-      } else {
-        next.add(type);
-      }
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
       return next;
     });
   };
 
   const filters = [
-    { label: "Only New", checked: onlyNew, onChange: setOnlyNew },
+    { label: "Only new", checked: onlyNew, onChange: setOnlyNew },
     ...(jellyfinAvailable ? [{ label: "Not in Jellyfin", checked: notInJF, onChange: setNotInJF }] : []),
     ...(plexAvailable ? [{ label: "Not in Plex", checked: notInPlex, onChange: setNotInPlex }] : []),
     ...(navidromeAvailable ? [{ label: "Not in Navidrome", checked: notInND, onChange: setNotInND }] : []),
-    { label: "Group by Type", checked: groupByType, onChange: setGroupByType },
+    { label: "Group by type", checked: groupByType, onChange: setGroupByType },
   ];
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Skeleton className="h-8 w-28" />
-          <Skeleton className="h-8 w-36" />
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <Skeleton key={i} className="aspect-square rounded-lg" />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const renderGrid = (items: Release[]) => (
+    <div className={RELEASE_GRID}>
+      {items.map((r, i) => (
+        <BlurFade key={r.id} inView delay={Math.min(i % 12, 11) * 0.035} offset={12} direction="up">
+          <ReleaseCard release={r} onMarkSeen={onMarkSeen} jellyfinAvailable={jellyfinAvailable} plexAvailable={plexAvailable} navidromeAvailable={navidromeAvailable} />
+        </BlurFade>
+      ))}
+    </div>
+  );
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <Button size="sm" variant="secondary" className="h-8 text-xs gap-1.5" onClick={onMarkAllSeen}>
-          <CheckCheck className="h-3.5 w-3.5" /> Mark All Seen
-        </Button>
-        {jellyfinAvailable && (
-          <Button size="sm" variant="secondary" className="h-8 text-xs gap-1.5" onClick={onCheckAllJellyfin}>
-            <Server className="h-3.5 w-3.5" /> Check All Jellyfin
-          </Button>
-        )}
-        {plexAvailable && (
-          <Button size="sm" variant="secondary" className="h-8 text-xs gap-1.5" onClick={onCheckAllPlex}>
-            <Server className="h-3.5 w-3.5" /> Check All Plex
-          </Button>
-        )}
-        {navidromeAvailable && (
-          <Button size="sm" variant="secondary" className="h-8 text-xs gap-1.5" onClick={onCheckAllNavidrome}>
-            <Server className="h-3.5 w-3.5" /> Check All Navidrome
-          </Button>
-        )}
-        <div className="h-4 w-px bg-border mx-1" />
-        {filters.map(f => (
-          <label key={f.label} className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
-            <Checkbox
-              checked={f.checked}
-              onCheckedChange={(v) => f.onChange(!!v)}
-              className="h-3.5 w-3.5"
-            />
-            {f.label}
-          </label>
-        ))}
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-center gap-2">
+        <ActionPill onClick={onMarkAllSeen}><CheckCheck /> Mark all seen</ActionPill>
+        {jellyfinAvailable && <ActionPill onClick={onCheckAllJellyfin}><Server /> Check Jellyfin</ActionPill>}
+        {plexAvailable && <ActionPill onClick={onCheckAllPlex}><Server /> Check Plex</ActionPill>}
+        {navidromeAvailable && <ActionPill onClick={onCheckAllNavidrome}><Server /> Check Navidrome</ActionPill>}
+        <div className="mx-1.5 hidden h-5 w-px bg-white/10 sm:block" />
+        {filters.map(f => <FilterChip key={f.label} {...f} />)}
       </div>
 
-      {groupByType ? (
+      {isLoading ? (
+        <SkeletonGrid />
+      ) : filtered.length === 0 ? (
+        <EmptyState>No releases match your filters.</EmptyState>
+      ) : groupByType ? (
         typeOrder.map(type => {
           const items = grouped[type];
           if (!items?.length) return null;
           const collapsed = collapsedGroups.has(type);
           return (
-            <div key={type}>
-              <button
-                className="flex items-center gap-2 mb-3 group cursor-pointer"
-                onClick={() => toggleGroup(type)}
-              >
-                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsed ? "-rotate-90" : ""}`} />
-                <span className={`text-sm font-semibold ${typeBadgeClass[type].replace("badge-", "text-badge-")}`}>
-                  {typeLabels[type]}
-                </span>
-                <span className="text-xs text-muted-foreground font-mono">({items.length})</span>
-              </button>
-              <AnimatePresence>
+            <section key={type}>
+              <SectionToggle label={typeLabels[type]} count={items.length} collapsed={collapsed} onClick={() => toggleGroup(type)} dotClass={typeColor[type]} />
+              <AnimatePresence initial={false}>
                 {!collapsed && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3"
+                    transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                    className="overflow-hidden"
                   >
-                    {items.map(r => (
-                      <ReleaseCard key={r.id} release={r} onMarkSeen={onMarkSeen} jellyfinAvailable={jellyfinAvailable} plexAvailable={plexAvailable} navidromeAvailable={navidromeAvailable} />
-                    ))}
+                    <div className="pt-1 pb-2">{renderGrid(items)}</div>
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
+            </section>
           );
         })
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3">
-          {filtered.map(r => (
-            <ReleaseCard key={r.id} release={r} onMarkSeen={onMarkSeen} jellyfinAvailable={jellyfinAvailable} plexAvailable={plexAvailable} navidromeAvailable={navidromeAvailable} />
-          ))}
-        </div>
-      )}
-
-      {filtered.length === 0 && (
-        <div className="text-center py-16 text-muted-foreground">
-          <p className="text-sm">No releases match your filters.</p>
-        </div>
+        renderGrid(filtered)
       )}
     </div>
   );

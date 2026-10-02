@@ -1,12 +1,12 @@
-import { useState } from "react";
-import Header from "@/components/Header";
-import StatsBar from "@/components/StatsBar";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { AnimatePresence, motion } from "motion/react";
+import AppShell, { type HomeTab } from "@/components/AppShell";
 import LatestReleases from "@/components/LatestReleases";
 import Timeline from "@/components/Timeline";
 import FollowedArtists from "@/components/FollowedArtists";
-import AnimatedBackground from "@/components/AnimatedBackground";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Disc3, Clock, Users } from "lucide-react";
+import CheckProgressDialog from "@/components/CheckProgressDialog";
+import { NumberTicker } from "@/components/ui/number-ticker";
 import {
   useLatestReleases,
   useFollowedArtists,
@@ -19,11 +19,23 @@ import {
 } from "@/hooks/use-api";
 import { useLibraryCheck } from "@/hooks/use-library-check";
 import { integrationAPI } from "@/services/api";
-import CheckProgressDialog from "@/components/CheckProgressDialog";
 import { toast } from "sonner";
+
+const TITLES: Record<HomeTab, { eyebrow: string; title: string }> = {
+  releases: { eyebrow: "Fresh drops", title: "Latest releases" },
+  timeline: { eyebrow: "Chronology", title: "Release timeline" },
+  artists: { eyebrow: "Your roster", title: "Followed artists" },
+};
 
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [params] = useSearchParams();
+  const raw = params.get("tab");
+  const tab: HomeTab = raw === "timeline" || raw === "artists" ? raw : "releases";
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [tab]);
 
   const { data: releases = [], isLoading: releasesLoading } = useLatestReleases();
   const { data: artists = [], isLoading: artistsLoading } = useFollowedArtists();
@@ -39,9 +51,7 @@ const Index = () => {
   const plexCheck = useLibraryCheck({ checkFn: integrationAPI.checkPlex, serviceName: "Plex" });
   const navidromeCheck = useLibraryCheck({ checkFn: integrationAPI.checkNavidrome, serviceName: "Navidrome" });
 
-  const handleMarkSeen = (id: number) => {
-    markSeen.mutate(id);
-  };
+  const handleMarkSeen = (id: number) => markSeen.mutate(id);
 
   const handleMarkAllSeen = () => {
     markAllSeen.mutate(undefined, {
@@ -56,90 +66,122 @@ const Index = () => {
     });
   };
 
-  const handleCheckAllJellyfin = () => jellyfinCheck.run(releases);
-  const handleCheckAllPlex = () => plexCheck.run(releases);
-  const handleCheckAllNavidrome = () => navidromeCheck.run(releases);
+  const [refreshingIds, setRefreshingIds] = useState<Set<number>>(new Set());
 
+  // mutateAsync rather than mutate: per-call callbacks of mutate() only fire for
+  // the latest call, which would drop toasts and spinners when refreshing
+  // several artists at once.
   const handleRefresh = (id: number) => {
-    refreshArtist.mutate(id, {
-      onSuccess: (data) => toast.success(`${data.artist}: ${data.new_releases} new releases found`),
-      onError: (e) => toast.error(`Refresh failed: ${e.message}`),
-    });
+    setRefreshingIds((prev) => new Set(prev).add(id));
+    refreshArtist
+      .mutateAsync(id)
+      .then((data) => toast.success(`${data.artist}: ${data.new_releases} new releases found`))
+      .catch((e: Error) => toast.error(`Refresh failed: ${e.message}`))
+      .finally(() =>
+        setRefreshingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        }),
+      );
   };
 
+  const jellyfinAvailable = integrationStatus?.jellyfin_available ?? false;
+  const plexAvailable = integrationStatus?.plex_available ?? false;
+  const navidromeAvailable = integrationStatus?.navidrome_available ?? false;
+
   return (
-    <div className="min-h-screen bg-background relative">
-      <AnimatedBackground />
-      <div className="relative z-10">
-        <Header searchQuery={searchQuery} onSearchChange={setSearchQuery} />
-        <StatsBar
-          totalReleases={stats?.total_releases ?? 0}
-          newReleases={stats?.new_releases ?? 0}
-          followedArtists={stats?.total_artists ?? 0}
-          isLoading={!stats}
-        />
+    <AppShell searchQuery={searchQuery} onSearchChange={setSearchQuery}>
+      <section className="container pt-10 pb-8 sm:pt-16">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={tab}
+            initial={{ opacity: 0, y: 12, filter: "blur(8px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            exit={{ opacity: 0, y: -8, filter: "blur(6px)" }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <p className="mb-3 text-[11px] font-medium tracking-[0.25em] text-primary uppercase">{TITLES[tab].eyebrow}</p>
+            <h1 className="font-serif text-5xl leading-[0.95] tracking-tight sm:text-7xl">{TITLES[tab].title}</h1>
+          </motion.div>
+        </AnimatePresence>
 
-        <main className="container mx-auto px-4 py-6">
-          <Tabs defaultValue="releases" className="space-y-6">
-            <div className="flex justify-center">
-              <TabsList className="bg-secondary/50 border border-border h-10">
-                <TabsTrigger value="releases" className="gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-sm">
-                  <Disc3 className="h-3.5 w-3.5" /> Latest Releases
-                </TabsTrigger>
-                <TabsTrigger value="timeline" className="gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-sm">
-                  <Clock className="h-3.5 w-3.5" /> Timeline
-                </TabsTrigger>
-                <TabsTrigger value="artists" className="gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-sm">
-                  <Users className="h-3.5 w-3.5" /> Followed Artists
-                </TabsTrigger>
-              </TabsList>
-            </div>
+        <dl className="mt-8 flex flex-wrap gap-x-10 gap-y-4">
+          <Stat label="New" value={stats?.new_releases} accent />
+          <Stat label="Releases" value={stats?.total_releases} />
+          <Stat label="Artists" value={stats?.total_artists} />
+        </dl>
+      </section>
 
-            <TabsContent value="releases" className="mt-0">
+      <main className="container">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={tab}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {tab === "releases" && (
               <LatestReleases
                 releases={releases}
                 isLoading={releasesLoading}
                 onMarkSeen={handleMarkSeen}
                 onMarkAllSeen={handleMarkAllSeen}
-                onCheckAllJellyfin={handleCheckAllJellyfin}
-                onCheckAllPlex={handleCheckAllPlex}
-                onCheckAllNavidrome={handleCheckAllNavidrome}
+                onCheckAllJellyfin={() => jellyfinCheck.run(releases)}
+                onCheckAllPlex={() => plexCheck.run(releases)}
+                onCheckAllNavidrome={() => navidromeCheck.run(releases)}
                 searchQuery={searchQuery}
-                jellyfinAvailable={integrationStatus?.jellyfin_available ?? false}
-                plexAvailable={integrationStatus?.plex_available ?? false}
-                navidromeAvailable={integrationStatus?.navidrome_available ?? false}
+                jellyfinAvailable={jellyfinAvailable}
+                plexAvailable={plexAvailable}
+                navidromeAvailable={navidromeAvailable}
               />
-            </TabsContent>
-
-            <TabsContent value="timeline" className="mt-0">
+            )}
+            {tab === "timeline" && (
               <Timeline
                 releases={releases}
                 isLoading={releasesLoading}
                 searchQuery={searchQuery}
-                jellyfinAvailable={integrationStatus?.jellyfin_available ?? false}
-                plexAvailable={integrationStatus?.plex_available ?? false}
-                navidromeAvailable={integrationStatus?.navidrome_available ?? false}
+                jellyfinAvailable={jellyfinAvailable}
+                plexAvailable={plexAvailable}
+                navidromeAvailable={navidromeAvailable}
               />
-            </TabsContent>
-
-            <TabsContent value="artists" className="mt-0">
+            )}
+            {tab === "artists" && (
               <FollowedArtists
                 artists={artists}
                 isLoading={artistsLoading}
                 onUnfollow={handleUnfollow}
                 onRefresh={handleRefresh}
+                refreshingIds={refreshingIds}
                 searchQuery={searchQuery}
                 integrationStatus={integrationStatus}
               />
-            </TabsContent>
-          </Tabs>
-        </main>
-      </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </main>
+
       <CheckProgressDialog {...jellyfinCheck.dialogProps} />
       <CheckProgressDialog {...plexCheck.dialogProps} />
       <CheckProgressDialog {...navidromeCheck.dialogProps} />
-    </div>
+    </AppShell>
   );
 };
+
+const Stat = ({ label, value, accent }: { label: string; value?: number; accent?: boolean }) => (
+  <div>
+    <dt className="text-[11px] tracking-widest text-muted-foreground uppercase">{label}</dt>
+    <dd className="mt-1 font-mono text-3xl font-medium tabular-nums">
+      {value === undefined ? (
+        <span className="inline-block h-8 w-12 animate-pulse rounded-md bg-white/5" />
+      ) : value === 0 ? (
+        <span className={accent ? "text-primary" : "text-foreground"}>0</span>
+      ) : (
+        <NumberTicker value={value} className={accent ? "text-primary dark:text-primary" : "text-foreground dark:text-foreground"} />
+      )}
+    </dd>
+  </div>
+);
 
 export default Index;

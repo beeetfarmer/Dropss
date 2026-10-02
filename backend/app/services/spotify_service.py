@@ -173,6 +173,7 @@ class SpotifyService:
                         'id': track['id'],
                         'name': track['name'],
                         'track_number': track['track_number'],
+                        'artist_ids': [a['id'] for a in track.get('artists') or [] if a.get('id')],
                         'duration_ms': track['duration_ms'],
                         'spotify_url': track['external_urls']['spotify']
                     })

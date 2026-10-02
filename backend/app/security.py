@@ -268,9 +268,20 @@ def csrf_cookie_samesite() -> str:
     return "strict" if settings.auth_cookie_secure else "lax"
 
 
+LOOPBACK_HOSTS = ("localhost", "127.0.0.1", "[::1]")
+
+
 def _allowed_origins() -> set[str]:
     settings = get_settings()
-    return {origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()}
+    origins = {origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()}
+    # localhost, 127.0.0.1 and [::1] are the same machine; allowing one allows
+    # all three. Needed because Spotify OAuth rejects "localhost" redirect URIs,
+    # forcing local users onto 127.0.0.1.
+    for origin in list(origins):
+        for host in LOOPBACK_HOSTS:
+            if f"//{host}" in origin:
+                origins.update(origin.replace(f"//{host}", f"//{alias}") for alias in LOOPBACK_HOSTS)
+    return origins
 
 
 def verify_csrf_request(request: Request):

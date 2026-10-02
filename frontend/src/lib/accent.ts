@@ -18,7 +18,6 @@ const CSS_VARS = [
   "--primary",
   "--ring",
   "--badge-ep",
-  "--status-available",
   "--sidebar-primary",
   "--sidebar-ring",
 ] as const;
