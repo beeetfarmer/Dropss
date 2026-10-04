@@ -1,0 +1,196 @@
+name: Release
+
+# main        -> :latest and :sha-<commit>               rolling build (production compose tracks :latest)
+# tag vX.Y.Z  -> :X.Y.Z and :sha-<commit>                versioned release; an existing X.Y.Z is never overwritten
+# Every check from dev.yml runs again first; the images are pushed only if all of them pass.
+# Images: beeetfarmer/dropss-backend and beeetfarmer/dropss-frontend.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  CHECKOUT_TOKEN: ${{ github.token }}
+
+jobs:
+  # ── Copied unchanged from dev.yml: backend, frontend, sast, secrets. ──
+  backend:
+    name: Backend tests and audit
+    runs-on: docker
+    container:
+      image: docker.io/library/python:3.12-alpine    # same base as backend/Dockerfile
+    env:
+      APP_SECRET_KEY: ci-only-not-a-secret
+    steps:
+      - name: Checkout
+        run: |
+          apk add --no-cache git
+          git config --global --add safe.directory "$PWD"
+          git init -q . && git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git -c "http.extraheader=Authorization: token $CHECKOUT_TOKEN" fetch -q --depth=1 origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+      - name: Install
+        working-directory: backend
+        run: pip install -q --root-user-action=ignore -r requirements.txt pip-audit
+      - name: Tests
+        working-directory: backend
+        run: python -m tests.test_notifications && python -m tests.test_spotify_account
+      - name: Dependency audit
+        working-directory: backend
+        run: pip-audit -r requirements.txt
+
+  frontend:
+    name: Frontend tests, build and audit
+    runs-on: docker
+    container:
+      image: docker.io/library/node:24-alpine    # same base as frontend/Dockerfile
+    steps:
+      - name: Checkout
+        run: |
+          apk add --no-cache git
+          git config --global --add safe.directory "$PWD"
+          git init -q . && git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git -c "http.extraheader=Authorization: token $CHECKOUT_TOKEN" fetch -q --depth=1 origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+      - name: Install
+        working-directory: frontend
+        run: npm ci --no-fund
+      - name: Dependency audit
+        working-directory: frontend
+        run: node scripts/audit-check.mjs
+      - name: Tests
+        working-directory: frontend
+        run: npm test
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  sast:
+    name: Semgrep
+    runs-on: docker
+    container:
+      image: docker.io/semgrep/semgrep:1.178.0
+    steps:
+      - name: Checkout
+        run: |
+          git config --global --add safe.directory "$PWD"
+          git init -q . && git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git -c "http.extraheader=Authorization: token $CHECKOUT_TOKEN" fetch -q --depth=1 origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+      - name: Scan
+        run: >
+          semgrep scan --metrics off --error
+          --config p/owasp-top-ten --config p/dockerfile
+          --exclude-rule python.lang.security.audit.md5-used-as-password.md5-used-as-password
+          --exclude-rule python.lang.security.insecure-hash-algorithms-md5.insecure-hash-algorithm-md5
+
+  secrets:
+    name: Gitleaks
+    runs-on: docker
+    container:
+      image: docker.io/zricethezav/gitleaks:v8.30.1
+    steps:
+      - name: Checkout full history
+        run: |
+          git config --global --add safe.directory "$PWD"
+          git init -q . && git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git -c "http.extraheader=Authorization: token $CHECKOUT_TOKEN" fetch -q origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+      - name: Scan history
+        run: gitleaks git . --redact --exit-code 1
+
+  publish:
+    name: Build, scan and publish images
+    needs: [backend, frontend, sast, secrets]
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: docker
+    container:
+      image: docker.io/library/docker:28-cli
+    env:
+      NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - name: Install git
+        run: apk add --no-cache git
+      - name: Checkout
+        run: |
+          git config --global --add safe.directory "$PWD"
+          git init -q . && git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git -c "http.extraheader=Authorization: token $CHECKOUT_TOKEN" fetch -q --depth=1 origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+      - name: Check configuration
+        run: |
+          [ -n "$NAMESPACE" ] || { echo "Set the DOCKERHUB_NAMESPACE Actions variable"; exit 1; }
+          [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ] || { echo "Set DOCKERHUB_USERNAME and DOCKERHUB_TOKEN secrets"; exit 1; }
+      - name: Work out tags
+        run: |
+          short=$(echo "$GITHUB_SHA" | cut -c1-7)
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            version="${GITHUB_REF_NAME#v}"
+            echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "Tag $GITHUB_REF_NAME is not vMAJOR.MINOR.PATCH"; exit 1; }
+            tags="$version sha-$short"
+          else
+            version="latest-$short"
+            tags="latest sha-$short"
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "TAGS=$tags" >> "$GITHUB_ENV"
+          echo "Publishing $NAMESPACE/dropss-{backend,frontend} with tags: $tags"
+      - name: Build
+        run: |
+          for svc in backend frontend; do
+            docker build --pull --load \
+              --label org.opencontainers.image.version="$VERSION" \
+              --label org.opencontainers.image.revision="$GITHUB_SHA" \
+              --label org.opencontainers.image.source="https://github.com/beeetfarmer/Dropss" \
+              -t "dropss-$svc:release-$GITHUB_RUN_NUMBER" "$svc"
+          done
+      - name: Scan images (fail on fixable HIGH or CRITICAL)
+        run: |
+          for svc in backend frontend; do
+            docker save "dropss-$svc:release-$GITHUB_RUN_NUMBER" | docker run --rm -i --entrypoint sh docker.io/aquasec/trivy:0.74.0 \
+              -c 'cat > /tmp/image.tar && trivy image --quiet --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --input /tmp/image.tar'
+          done
+      - name: Scan Dockerfiles
+        run: >
+          tar -c backend/Dockerfile frontend/Dockerfile | docker run --rm -i --entrypoint sh docker.io/aquasec/trivy:0.74.0
+          -c 'mkdir /w && tar -x -C /w && trivy config --quiet --severity HIGH,CRITICAL --exit-code 1 /w'
+      - name: Software bill of materials
+        run: |
+          for svc in backend frontend; do
+            echo "── dropss-$svc ──"
+            docker save "dropss-$svc:release-$GITHUB_RUN_NUMBER" | docker run --rm -i --entrypoint sh docker.io/aquasec/trivy:0.74.0 \
+              -c 'cat > /tmp/image.tar && trivy image --quiet --format cyclonedx --input /tmp/image.tar'
+          done
+      - name: Sign in to Docker Hub
+        run: echo "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin docker.io
+      - name: Refuse to overwrite a released version
+        run: |
+          [ "$GITHUB_REF_TYPE" = "tag" ] || exit 0
+          for svc in backend frontend; do
+            if docker buildx imagetools inspect "docker.io/$NAMESPACE/dropss-$svc:$VERSION" >/dev/null 2>&1; then
+              echo "docker.io/$NAMESPACE/dropss-$svc:$VERSION already exists. Release a new version instead."; exit 1
+            fi
+          done
+      - name: Push the scanned images
+        run: |
+          for svc in backend frontend; do
+            for t in $TAGS; do
+              docker tag "dropss-$svc:release-$GITHUB_RUN_NUMBER" "docker.io/$NAMESPACE/dropss-$svc:$t"
+              docker push -q "docker.io/$NAMESPACE/dropss-$svc:$t"
+            done
+          done
+      - name: Sign out and clean up
+        if: always()
+        run: |
+          docker logout docker.io || true
+          for svc in backend frontend; do
+            docker image rm -f "dropss-$svc:release-$GITHUB_RUN_NUMBER" $(for t in $TAGS; do echo "docker.io/$NAMESPACE/dropss-$svc:$t"; done) 2>/dev/null || true
+          done
