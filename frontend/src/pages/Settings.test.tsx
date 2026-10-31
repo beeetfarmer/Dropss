@@ -69,6 +69,26 @@ describe("Settings", () => {
     expect(mutate.mock.calls[0][0]).toEqual({ hide_seen_releases: false });
   });
 
+  it("saves the library check time", () => {
+    renderSettings();
+
+    fireEvent.change(screen.getByLabelText("Library Check Time"), { target: { value: "03:30" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(mutate.mock.calls[0][0]).toEqual({ library_check_time: "03:30" });
+  });
+
+  it("saves a blank library check time to turn it off", () => {
+    settings.library_check_time = "03:30";
+    renderSettings();
+
+    expect(screen.getByLabelText("Library Check Time")).toHaveValue("03:30");
+    fireEvent.change(screen.getByLabelText("Library Check Time"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(mutate.mock.calls[0][0]).toEqual({ library_check_time: "" });
+  });
+
   it("saves months back as a number", () => {
     renderSettings();
 

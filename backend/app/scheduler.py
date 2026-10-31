@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 from .database import SessionLocal
 from .models import Artist, Release
+from .services.library_check import check_libraries
 from .services.spotify_service import SpotifyRateLimited, SpotifyService
 from .services.notifications import configured_notifiers, notify_new_releases
 from .config import get_settings
@@ -182,6 +183,34 @@ def check_status() -> dict:
     return {"running": running, "cancelling": running and _cancel_requested.is_set(), **_progress}
 
 
+def run_library_check():
+    logger.info("Starting library check")
+    with SessionLocal() as db:
+        asyncio.run(check_libraries(db))
+
+
+def _schedule_library_check(check_time: str, tz: ZoneInfo):
+    trigger = None
+    if check_time:
+        try:
+            hour, minute = map(int, check_time.split(':'))
+            trigger = CronTrigger(hour=hour, minute=minute, timezone=tz)
+        except ValueError:
+            logger.warning("Invalid library check time '%s'; library check is off", check_time)
+
+    if trigger:
+        scheduler.add_job(
+            run_library_check,
+            trigger=trigger,
+            id='daily_library_check',
+            name='Check media libraries',
+            misfire_grace_time=3600,
+            replace_existing=True
+        )
+    elif scheduler.get_job('daily_library_check'):
+        scheduler.remove_job('daily_library_check')
+
+
 def start_scheduler():
     settings = get_settings()
 
@@ -204,6 +233,8 @@ def start_scheduler():
         misfire_grace_time=3600,
         replace_existing=True
     )
+
+    _schedule_library_check(settings.library_check_time, tz)
 
     if not scheduler.running:
         scheduler.start()

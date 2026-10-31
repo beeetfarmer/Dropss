@@ -97,6 +97,7 @@ const sections: SectionConfig[] = [
     description: "General application settings",
     fields: [
       { key: "release_check_time", label: "Release Check Time", placeholder: "09:00 (24-hour format)" },
+      { key: "library_check_time", label: "Library Check Time", placeholder: "03:30 (blank to turn off)" },
       { key: "timezone", label: "Timezone", placeholder: "UTC" },
       { key: "release_months_back", label: "Release Months Back", placeholder: "3", type: "number" },
       { key: "hide_seen_releases", label: "Hide releases marked as seen", type: "switch" },
