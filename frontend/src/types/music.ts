@@ -179,6 +179,7 @@ export interface ApiRefreshStatus {
   new_releases: number;
   failed: number;
   cancelled: boolean;
+  finished: boolean;
 }
 
 export interface ApiLastFmImportResult {

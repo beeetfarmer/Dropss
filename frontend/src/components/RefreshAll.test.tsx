@@ -25,10 +25,12 @@ const IDLE: ApiRefreshStatus = {
   new_releases: 0,
   failed: 0,
   cancelled: false,
+  finished: false,
 };
 
 const RUNNING: ApiRefreshStatus = { ...IDLE, running: true, total: 4, checked: 1, current: "Some Artist" };
-const DONE: ApiRefreshStatus = { ...IDLE, total: 4, checked: 4, new_releases: 2 };
+const DONE: ApiRefreshStatus = { ...IDLE, total: 4, checked: 4, new_releases: 2, finished: true };
+const CANCELLED: ApiRefreshStatus = { ...IDLE, total: 4, checked: 2, cancelled: true, finished: true };
 
 let client: QueryClient;
 
@@ -74,6 +76,14 @@ const clickStart = async () => {
 const clickButton = (name: string) => act(async () => {
   fireEvent.click(screen.getByRole("button", { name, hidden: true }));
 });
+
+// The dialog's built-in X has the same name; CSS hides it, which jsdom doesn't apply.
+const closeBox = async () => {
+  const [footerClose] = screen.getAllByRole("button", { name: "Close", hidden: true });
+  await act(async () => {
+    fireEvent.click(footerClose);
+  });
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -169,7 +179,7 @@ describe("cancelling", () => {
     await renderProvider();
     await clickStart();
 
-    await poll({ ...IDLE, total: 4, checked: 2, cancelled: true });
+    await poll(CANCELLED);
 
     expect(screen.getByText("Refresh cancelled")).toBeInTheDocument();
     expect(screen.getByText("Checked 2 of 4 artists")).toBeInTheDocument();
@@ -242,7 +252,7 @@ describe("running in the background", () => {
   it("says so when a backgrounded run was cancelled", async () => {
     await background();
 
-    await poll({ ...IDLE, total: 4, checked: 2, cancelled: true });
+    await poll(CANCELLED);
 
     expect(toast.info).toHaveBeenCalledWith("Refresh cancelled after 2 of 4 artists. 0 new releases found");
   });
@@ -276,18 +286,14 @@ describe("finishing with the box open", () => {
     await clickStart();
     await poll(DONE);
 
-    // The dialog's built-in X has the same name; CSS hides it, which jsdom doesn't apply.
-    const [footerClose] = screen.getAllByRole("button", { name: "Close", hidden: true });
-    await act(async () => {
-      fireEvent.click(footerClose);
-    });
+    await closeBox();
 
     expect(screen.queryByText("Refresh complete")).not.toBeInTheDocument();
   });
 
   it("handles a run that ends before the first poll", async () => {
     await renderProvider();
-    setStatus({ ...IDLE, total: 1, checked: 1 });
+    setStatus({ ...DONE, total: 1, checked: 1 });
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Start" }));
@@ -298,12 +304,51 @@ describe("finishing with the box open", () => {
 
   it("explains an empty run", async () => {
     await renderProvider();
+    setStatus({ ...IDLE, finished: true });
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Start" }));
     });
 
     expect(await screen.findByText("No artists to check")).toBeInTheDocument();
+  });
+});
+
+describe("a run that dies with the server", () => {
+  const MESSAGE = "The server restarted before the refresh finished. Releases found so far are saved.";
+
+  it("says it was interrupted instead of complete", async () => {
+    await renderProvider();
+    await clickStart();
+
+    await poll(IDLE);
+
+    expect(screen.getByText("Refresh interrupted")).toBeInTheDocument();
+    expect(screen.getByText(MESSAGE)).toBeInTheDocument();
+    expect(screen.queryByText("Refresh complete")).not.toBeInTheDocument();
+    expect(screen.queryByText("No artists to check")).not.toBeInTheDocument();
+  });
+
+  it("warns instead of reporting success when in the background", async () => {
+    await renderProvider();
+    await clickStart();
+    await clickButton("Run in background");
+
+    await poll(IDLE);
+
+    expect(toast.warning).toHaveBeenCalledWith(MESSAGE);
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("can start again afterwards", async () => {
+    await renderProvider();
+    await clickStart();
+    await poll(IDLE);
+
+    await closeBox();
+    await clickStart();
+
+    expect(api.refreshAll).toHaveBeenCalledTimes(2);
   });
 });
 

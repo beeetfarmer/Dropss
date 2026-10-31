@@ -193,6 +193,28 @@ def test_cancel_stops_after_the_current_artist_and_keeps_its_results(db, spotify
     assert db.query(Release).count() == 1
 
 
+def test_finished_is_only_set_once_a_run_has_ended(db, spotify, monkeypatch):
+    add_artists(db, "a")
+
+    async def during_run(artist_id, months_back):
+        assert scheduler.check_status()["finished"] is False
+        return []
+
+    spotify.get_artist_releases = during_run
+    monkeypatch.setitem(scheduler._progress, "finished", True)
+
+    scheduler.run_sync_check()
+
+    assert scheduler.check_status()["finished"] is True
+
+
+def test_a_restarted_server_reports_no_finished_run(client, monkeypatch):
+    # What a restart leaves behind: fresh state, nothing running.
+    monkeypatch.setattr(scheduler, "_progress", {**scheduler._progress, "finished": False, "total": 0})
+
+    assert client.get("/releases/refresh").json()["finished"] is False
+
+
 def test_cancel_does_nothing_when_idle():
     assert scheduler.cancel_check() is False
     assert scheduler.check_status()["cancelling"] is False

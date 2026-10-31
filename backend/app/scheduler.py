@@ -18,7 +18,9 @@ logger = logging.getLogger(__name__)
 # Scheduled and manual checks share this, so they never sweep at the same time.
 _check_lock = threading.Lock()
 _cancel_requested = threading.Event()
-_progress = {"total": 0, "checked": 0, "current": None, "new_releases": 0, "failed": 0, "cancelled": False}
+# Only in memory: "finished" stays False after a restart, which is how a run that
+# died with the server is told apart from one that ended.
+_progress = {"total": 0, "checked": 0, "current": None, "new_releases": 0, "failed": 0, "cancelled": False, "finished": False}
 
 
 async def check_for_new_releases():
@@ -136,7 +138,7 @@ def _begin_check() -> bool:
     if not _check_lock.acquire(blocking=False):
         return False
     _cancel_requested.clear()
-    _progress.update(total=0, checked=0, current=None, new_releases=0, failed=0, cancelled=False)
+    _progress.update(total=0, checked=0, current=None, new_releases=0, failed=0, cancelled=False, finished=False)
     return True
 
 
@@ -148,6 +150,7 @@ def _run_check_and_release():
         loop.run_until_complete(check_for_new_releases())
     finally:
         loop.close()
+        _progress["finished"] = True
         _check_lock.release()
 
 

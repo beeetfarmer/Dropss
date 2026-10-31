@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Summary } from "@/components/CheckProgressDialog";
 import { useCancelRefresh, useRefetchReleases, useRefreshStatus, useStartRefresh } from "@/hooks/use-api";
+import { cn } from "@/lib/utils";
 import type { ApiRefreshStatus } from "@/types/music";
 
 const RefreshAllContext = createContext({ start: () => {}, isRunning: false });
@@ -23,9 +24,12 @@ export const useRefreshAll = () => useContext(RefreshAllContext);
 
 const plural = (count: number, noun: string) => `${count} ${noun}${count !== 1 ? "s" : ""}`;
 
-const notifyFinished = ({ new_releases, failed, cancelled, checked, total }: ApiRefreshStatus) => {
+const INTERRUPTED = "The server restarted before the refresh finished. Releases found so far are saved.";
+
+const notifyFinished = ({ new_releases, failed, cancelled, checked, total, finished }: ApiRefreshStatus) => {
   const found = `${plural(new_releases, "new release")} found`;
-  if (cancelled) toast.info(`Refresh cancelled after ${checked} of ${plural(total, "artist")}. ${found}`);
+  if (!finished) toast.warning(INTERRUPTED);
+  else if (cancelled) toast.info(`Refresh cancelled after ${checked} of ${plural(total, "artist")}. ${found}`);
   else if (failed) toast.warning(`${found}, but some artists could not be checked`);
   else toast.success(found);
 };
@@ -122,10 +126,18 @@ const RefreshAllDialog = ({ open, onOpenChange, status, isRunning, onCancel }: R
   const cancelling = status?.cancelling ?? false;
   const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
   const current = isRunning ? status?.current : null;
+  const interrupted = !isRunning && !status?.finished;
 
-  const title = isRunning ? "Refreshing releases" : status?.cancelled ? "Refresh cancelled" : "Refresh complete";
-  const description =
-    isRunning && !total
+  const title = isRunning
+    ? "Refreshing releases"
+    : interrupted
+      ? "Refresh interrupted"
+      : status?.cancelled
+        ? "Refresh cancelled"
+        : "Refresh complete";
+  const description = interrupted
+    ? INTERRUPTED
+    : isRunning && !total
       ? "Starting…"
       : !isRunning && !total
         ? "No artists to check"
@@ -141,12 +153,12 @@ const RefreshAllDialog = ({ open, onOpenChange, status, isRunning, onCancel }: R
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          <div className="flex items-center gap-3">
+          <div className={cn("flex items-center gap-3", interrupted && "hidden")}>
             <Progress value={pct} aria-label="Refresh progress" className="h-2 bg-primary/10" />
             <span className="w-10 text-right font-mono text-xs text-muted-foreground">{pct}%</span>
           </div>
 
-          <div className="h-[58px]">
+          <div className={cn("h-[58px]", interrupted && "hidden")}>
             <AnimatePresence mode="wait">
               {isRunning ? (
                 <motion.div

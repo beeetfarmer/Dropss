@@ -96,7 +96,7 @@ def test_refresh_status_is_exposed(client):
     body = client.get("/releases/refresh").json()
 
     assert body["running"] is False
-    assert set(body) == {"running", "cancelling", "total", "checked", "current", "new_releases", "failed", "cancelled"}
+    assert set(body) == {"running", "cancelling", "total", "checked", "current", "new_releases", "failed", "cancelled", "finished"}
 
 
 @pytest.mark.parametrize("cancelled", [True, False])
