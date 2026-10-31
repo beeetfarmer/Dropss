@@ -157,6 +157,70 @@ def test_manual_check_holds_the_lock_and_reports_failures(db, spotify):
     assert (status["new_releases"], status["failed"]) == (0, 3)
 
 
+def test_progress_counts_artists_as_they_are_checked(db, spotify):
+    add_artists(db, "a", "b")
+    seen = []
+
+    async def record(artist_id, months_back):
+        seen.append(dict(scheduler.check_status()))
+        return [release_data(f"{artist_id}-1")]
+
+    spotify.get_artist_releases = record
+
+    scheduler.run_sync_check()
+
+    assert [(s["checked"], s["current"], s["total"]) for s in seen] == [(0, "a", 2), (1, "b", 2)]
+    status = scheduler.check_status()
+    assert (status["checked"], status["current"], status["new_releases"]) == (2, None, 2)
+    assert status["cancelled"] is False
+
+
+def test_cancel_stops_after_the_current_artist_and_keeps_its_results(db, spotify):
+    add_artists(db, "a", "b", "c")
+
+    async def cancel_during_first(artist_id, months_back):
+        assert scheduler.cancel_check() is True
+        assert scheduler.check_status()["cancelling"] is True
+        return [release_data("r1")]
+
+    spotify.get_artist_releases = AsyncMock(side_effect=cancel_during_first)
+
+    scheduler.run_sync_check()
+
+    status = scheduler.check_status()
+    assert spotify.get_artist_releases.await_count == 1
+    assert (status["cancelled"], status["checked"], status["total"]) == (True, 1, 3)
+    assert db.query(Release).count() == 1
+
+
+def test_cancel_does_nothing_when_idle():
+    assert scheduler.cancel_check() is False
+    assert scheduler.check_status()["cancelling"] is False
+
+
+def test_a_new_check_clears_the_previous_cancel(db, spotify):
+    add_artists(db, "a", "b")
+    spotify.get_artist_releases = AsyncMock(side_effect=lambda *_: scheduler.cancel_check() and [])
+    scheduler.run_sync_check()
+    assert scheduler.check_status()["cancelled"] is True
+
+    spotify.get_artist_releases = AsyncMock(return_value=[])
+    scheduler.run_sync_check()
+
+    status = scheduler.check_status()
+    assert (status["cancelled"], status["cancelling"], status["checked"]) == (False, False, 2)
+
+
+def test_failures_count_towards_progress(db, spotify):
+    add_artists(db, "a", "b")
+    spotify.get_artist_releases.side_effect = [SpotifyServiceError("boom"), []]
+
+    scheduler.run_sync_check()
+
+    status = scheduler.check_status()
+    assert (status["checked"], status["failed"]) == (2, 1)
+
+
 def test_lock_is_released_when_the_check_crashes(session_factory, monkeypatch):
     monkeypatch.setattr(scheduler, "SessionLocal", MagicMock(side_effect=RuntimeError("no db")))
 

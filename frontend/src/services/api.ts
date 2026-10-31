@@ -1,5 +1,6 @@
 import type {
   ApiRelease,
+  ApiRefreshStatus,
   ApiArtist,
   ApiArtistSearch,
   ApiStats,
@@ -137,8 +138,9 @@ export const releaseAPI = {
 
   refreshAll: () => apiFetch<{ started: boolean }>("/releases/refresh", { method: "POST" }),
 
-  getRefreshStatus: () =>
-    apiFetch<{ running: boolean; new_releases: number; failed: number }>("/releases/refresh"),
+  getRefreshStatus: () => apiFetch<ApiRefreshStatus>("/releases/refresh"),
+
+  cancelRefresh: () => apiFetch<{ cancelled: boolean }>("/releases/refresh/cancel", { method: "POST" }),
 
   getStats: () => apiFetch<ApiStats>("/releases/stats"),
 

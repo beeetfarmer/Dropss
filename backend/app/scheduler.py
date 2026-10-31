@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 # Scheduled and manual checks share this, so they never sweep at the same time.
 _check_lock = threading.Lock()
-_last_check = {"new_releases": 0, "failed": 0}
+_cancel_requested = threading.Event()
+_progress = {"total": 0, "checked": 0, "current": None, "new_releases": 0, "failed": 0, "cancelled": False}
 
 
 async def check_for_new_releases():
@@ -26,9 +27,6 @@ async def check_for_new_releases():
     from .config import get_settings
     current_settings = get_settings()
 
-    total_new = 0
-    failed = 0
-
     db = SessionLocal()
     try:
         # Stalest first, so a sweep cut short by a rate limit resumes where it stopped.
@@ -36,17 +34,27 @@ async def check_for_new_releases():
 
         if not artists:
             logger.info("No artists to check")
-            return total_new, failed
+            return
 
         spotify = SpotifyService()
 
         notifiers = configured_notifiers()
 
+        _progress["total"] = len(artists)
+
         for checked, artist in enumerate(artists):
+            _progress["current"] = artist.name
             # Pace the sweep so paging every artist's discography doesn't burst
             # past Spotify's rolling rate-limit window.
             # ponytail: fixed 1s/artist; switch to Retry-After-aware backoff if still throttled
             await asyncio.sleep(1)
+
+            # Between artists only, so a cancelled run leaves no half-saved artist.
+            if _cancel_requested.is_set():
+                _progress["cancelled"] = True
+                logger.info("Release check cancelled after %d of %d artists", checked, len(artists))
+                break
+
             try:
                 logger.info("Checking releases for %s", artist.name)
 
@@ -78,11 +86,12 @@ async def check_for_new_releases():
                         db.add(new_release)
                         db.flush()
                         new_releases.append(release_data)
-                        total_new += 1
 
                 artist.last_checked = datetime.utcnow()
 
                 db.commit()
+
+                _progress["new_releases"] += len(new_releases)
 
                 if new_releases:
                     logger.info("Found %d new release(s) for %s", len(new_releases), artist.name)
@@ -100,25 +109,35 @@ async def check_for_new_releases():
             except SpotifyRateLimited:
                 logger.warning("Spotify rate limit reached at %s; stopping this release check", artist.name)
                 db.rollback()
-                failed += len(artists) - checked
+                _progress["failed"] += len(artists) - checked
                 break
 
             except Exception as e:
                 logger.exception("Error checking %s: %s", artist.name, e)
                 db.rollback()
-                failed += 1
+                _progress["failed"] += 1
 
-        logger.info("Release check complete. Found %d new release(s) total", total_new)
+            finally:
+                _progress["checked"] = checked + 1
+
+        logger.info("Release check complete. Found %d new release(s) total", _progress["new_releases"])
 
     except Exception as e:
         logger.exception("Error during release check: %s", e)
         db.rollback()
-        failed = max(failed, 1)
+        _progress["failed"] = max(_progress["failed"], 1)
 
     finally:
+        _progress["current"] = None
         db.close()
 
-    return total_new, failed
+
+def _begin_check() -> bool:
+    if not _check_lock.acquire(blocking=False):
+        return False
+    _cancel_requested.clear()
+    _progress.update(total=0, checked=0, current=None, new_releases=0, failed=0, cancelled=False)
+    return True
 
 
 def _run_check_and_release():
@@ -126,15 +145,14 @@ def _run_check_and_release():
     asyncio.set_event_loop(loop)
 
     try:
-        new_releases, failed = loop.run_until_complete(check_for_new_releases())
-        _last_check.update(new_releases=new_releases, failed=failed)
+        loop.run_until_complete(check_for_new_releases())
     finally:
         loop.close()
         _check_lock.release()
 
 
 def run_sync_check():
-    if _check_lock.acquire(blocking=False):
+    if _begin_check():
         _run_check_and_release()
     else:
         logger.warning("Skipping scheduled release check: one is already running")
@@ -142,14 +160,23 @@ def run_sync_check():
 
 def start_manual_check() -> bool:
     """Start a check in the background; False if one is already running."""
-    if not _check_lock.acquire(blocking=False):
+    if not _begin_check():
         return False
     threading.Thread(target=_run_check_and_release, daemon=True).start()
     return True
 
 
+def cancel_check() -> bool:
+    """Ask a running check to stop after the current artist; False if none is running."""
+    if not _check_lock.locked():
+        return False
+    _cancel_requested.set()
+    return True
+
+
 def check_status() -> dict:
-    return {"running": _check_lock.locked(), **_last_check}
+    running = _check_lock.locked()
+    return {"running": running, "cancelling": running and _cancel_requested.is_set(), **_progress}
 
 
 def start_scheduler():

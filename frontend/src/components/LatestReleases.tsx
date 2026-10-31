@@ -169,7 +169,7 @@ const LatestReleases = ({
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center gap-2">
-        <ActionPill onClick={onRefreshAll} disabled={isRefreshingAll}>
+        <ActionPill onClick={onRefreshAll}>
           {isRefreshingAll ? <Loader2 className="animate-spin" /> : <RefreshCw />} Refresh all
         </ActionPill>
         <ActionPill onClick={onMarkAllSeen}><CheckCheck /> Mark all seen</ActionPill>

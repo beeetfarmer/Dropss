@@ -48,10 +48,14 @@ describe("LatestReleases", () => {
     expect(onMarkAllSeen).toHaveBeenCalledOnce();
   });
 
-  it("disables refresh while one is running", () => {
-    renderReleases({ isRefreshingAll: true });
+  it("keeps refresh clickable while running so the progress can be reopened", () => {
+    const { onRefreshAll } = renderReleases({ isRefreshingAll: true });
+    const button = screen.getByRole("button", { name: "Refresh all" });
 
-    expect(screen.getByRole("button", { name: "Refresh all" })).toBeDisabled();
+    expect(button.querySelector(".animate-spin")).not.toBeNull();
+    fireEvent.click(button);
+
+    expect(onRefreshAll).toHaveBeenCalledOnce();
   });
 
   it("filters by search across release and artist names", () => {

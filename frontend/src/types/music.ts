@@ -170,6 +170,17 @@ export interface ApiSpotifyAccount {
 
 export type SpotifyPlaylistType = "album" | "single";
 
+export interface ApiRefreshStatus {
+  running: boolean;
+  cancelling: boolean;
+  total: number;
+  checked: number;
+  current: string | null;
+  new_releases: number;
+  failed: number;
+  cancelled: boolean;
+}
+
 export interface ApiLastFmImportResult {
   total_artists: number;
   new_artists: number;

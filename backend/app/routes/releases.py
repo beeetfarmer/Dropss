@@ -7,7 +7,7 @@ from ..models import Release, Artist
 from ..schemas.release import ReleaseResponse
 from ..services.spotify_service import SpotifyService
 from ..rate_limit import rate_limit
-from ..scheduler import check_status, start_manual_check
+from ..scheduler import cancel_check, check_status, start_manual_check
 from ..security import require_authenticated_request, require_write_request
 
 router = APIRouter(
@@ -118,6 +118,14 @@ async def refresh_all_releases(
     _: None = Depends(rate_limit(max_requests=5, window_seconds=60)),
 ):
     return {"started": start_manual_check()}
+
+
+@router.post("/refresh/cancel")
+async def cancel_refresh(
+    __: None = Depends(require_write_request),
+    _: None = Depends(rate_limit(max_requests=10, window_seconds=60)),
+):
+    return {"cancelled": cancel_check()}
 
 
 @router.get("/refresh")

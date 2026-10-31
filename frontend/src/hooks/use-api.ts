@@ -6,6 +6,7 @@ import type {
   Artist,
   SearchArtist,
   ApiIntegrationStatus,
+  ApiRefreshStatus,
   ApiStats,
   ApiSettings,
   ApiSettingsUpdate,
@@ -18,6 +19,7 @@ const keys = {
   latestReleases: ["releases", "latest"] as const,
   allReleases: ["releases", "all"] as const,
   stats: ["releases", "stats"] as const,
+  refreshStatus: ["refresh-status"] as const,
   followedArtists: ["artists", "followed"] as const,
   searchArtists: (q: string) => ["artists", "search", q] as const,
   artistReleases: (id: number) => ["artists", id, "releases"] as const,
@@ -173,27 +175,40 @@ export function useRefreshArtist() {
   });
 }
 
-export function useRefreshAllReleases() {
+export function useRefreshStatus(enabled: boolean) {
+  return useQuery<ApiRefreshStatus>({
+    queryKey: keys.refreshStatus,
+    queryFn: () => releaseAPI.getRefreshStatus(),
+    enabled,
+    refetchInterval: (query) => (query.state.data?.running ? 1500 : false),
+  });
+}
+
+// Returning the refetch keeps these pending until the status on screen is fresh.
+export function useStartRefresh() {
   const qc = useQueryClient();
   return useMutation({
-    // The sweep is paced per artist, so it outlives any single request: start
-    // it, then poll. If a check is already running this just waits for that one.
-    mutationFn: async () => {
-      await releaseAPI.refreshAll();
-      for (;;) {
-        const status = await releaseAPI.getRefreshStatus();
-        if (!status.running) return status;
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      }
-    },
-    onSuccess: () =>
-      Promise.all([
-        qc.invalidateQueries({ queryKey: keys.followedArtists }),
-        qc.invalidateQueries({ queryKey: keys.latestReleases }),
-        qc.invalidateQueries({ queryKey: keys.allReleases }),
-        qc.invalidateQueries({ queryKey: keys.stats }),
-      ]),
+    mutationFn: () => releaseAPI.refreshAll(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.refreshStatus }),
   });
+}
+
+export function useCancelRefresh() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => releaseAPI.cancelRefresh(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.refreshStatus }),
+  });
+}
+
+export function useRefetchReleases() {
+  const qc = useQueryClient();
+  return () => {
+    qc.invalidateQueries({ queryKey: keys.followedArtists });
+    qc.invalidateQueries({ queryKey: keys.latestReleases });
+    qc.invalidateQueries({ queryKey: keys.allReleases });
+    qc.invalidateQueries({ queryKey: keys.stats });
+  };
 }
 
 export function useImportLastFm() {

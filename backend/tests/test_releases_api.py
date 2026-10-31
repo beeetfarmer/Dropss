@@ -93,7 +93,19 @@ def test_refresh_reports_whether_a_new_check_started(client, started):
 
 
 def test_refresh_status_is_exposed(client):
-    assert client.get("/releases/refresh").json()["running"] is False
+    body = client.get("/releases/refresh").json()
+
+    assert body["running"] is False
+    assert set(body) == {"running", "cancelling", "total", "checked", "current", "new_releases", "failed", "cancelled"}
+
+
+@pytest.mark.parametrize("cancelled", [True, False])
+def test_cancel_reports_whether_a_check_was_running(client, cancelled):
+    with patch("app.routes.releases.cancel_check", return_value=cancelled):
+        response = client.post("/releases/refresh/cancel")
+
+    assert response.status_code == 200
+    assert response.json() == {"cancelled": cancelled}
 
 
 def test_refresh_is_rate_limited(client):
@@ -108,8 +120,11 @@ def test_refresh_endpoints_require_authentication(client, monkeypatch):
     monkeypatch.setenv("APP_PASSWORD", "test-password")
     get_settings.cache_clear()
 
-    with patch("app.routes.releases.start_manual_check") as start:
+    with patch("app.routes.releases.start_manual_check") as start, \
+            patch("app.routes.releases.cancel_check") as cancel:
         assert client.get("/releases/refresh").status_code == 401
         assert client.post("/releases/refresh").status_code in (401, 403)
+        assert client.post("/releases/refresh/cancel").status_code in (401, 403)
 
     start.assert_not_called()
+    cancel.assert_not_called()
