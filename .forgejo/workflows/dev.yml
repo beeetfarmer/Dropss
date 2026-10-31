@@ -35,10 +35,10 @@ jobs:
           git checkout -q FETCH_HEAD
       - name: Install
         working-directory: backend
-        run: pip install -q --root-user-action=ignore -r requirements.txt pip-audit
+        run: pip install -q --root-user-action=ignore -r requirements-dev.txt pip-audit
       - name: Tests
         working-directory: backend
-        run: python -m tests.test_notifications && python -m tests.test_spotify_account
+        run: python -m pytest
       - name: Dependency audit
         working-directory: backend
         run: pip-audit -r requirements.txt

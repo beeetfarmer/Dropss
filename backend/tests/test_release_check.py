@@ -1,25 +1,51 @@
-"""Run: python -m tests.test_release_check (from backend/)."""
 import asyncio
-import os
-import tempfile
 import threading
 import time
-from datetime import date
+from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 import spotipy
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app import scheduler
-from app.config import get_settings
-from app.database import Base
 from app.models import Artist, Release
-from app.routes.releases import get_latest_releases
-from app.routes.settings import SettingsUpdate, get_settings_endpoint, update_settings
-from app.services.spotify_service import MAX_RETRY_AFTER_SECONDS, SpotifyRateLimited, build_client
+from app.services.spotify_service import MAX_RETRY_AFTER_SECONDS, SpotifyRateLimited, SpotifyServiceError, build_client
+
+
+def add_artists(db, *names, **fields):
+    for name in names:
+        db.add(Artist(spotify_id=name, name=name, spotify_url=f"https://x/{name}", **fields))
+    db.commit()
+
+
+def release_data(spotify_id):
+    return {
+        "spotify_id": spotify_id,
+        "name": spotify_id,
+        "release_type": "album",
+        "release_date": date.today().isoformat(),
+        "spotify_url": f"https://x/{spotify_id}",
+        "image_url": None,
+        "total_tracks": 1,
+    }
+
+
+@pytest.fixture
+def spotify(monkeypatch, session_factory):
+    service = MagicMock()
+    service.get_artist_releases = AsyncMock(return_value=[])
+    monkeypatch.setattr(scheduler, "SpotifyService", lambda: service)
+    monkeypatch.setattr(scheduler, "configured_notifiers", lambda: [])
+    monkeypatch.setattr(scheduler.asyncio, "sleep", AsyncMock())
+    return service
+
+
+def wait_until_idle():
+    deadline = time.monotonic() + 5
+    while scheduler.check_status()["running"] and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert not scheduler.check_status()["running"]
 
 
 def test_long_retry_after_is_capped():
@@ -43,134 +69,117 @@ def test_long_retry_after_is_capped():
 
     sleeps = []
     with patch("urllib3.util.retry.time.sleep", side_effect=sleeps.append):
-        try:
+        with pytest.raises(spotipy.SpotifyException) as raised:
             client.artist_albums("x")
-            raise AssertionError("expected a 429")
-        except spotipy.SpotifyException as e:
-            assert e.http_status == 429
     server.shutdown()
 
+    assert raised.value.http_status == 429
     assert sleeps and max(sleeps) <= MAX_RETRY_AFTER_SECONDS
 
 
-def _session_with_artists(*names):
-    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
-    Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
-    with Session() as db:
-        for name in names:
-            db.add(Artist(spotify_id=name, name=name, spotify_url=f"https://x/{name}"))
-        db.commit()
-    return Session
+def test_new_release_is_saved_notified_and_marked(db, spotify, monkeypatch):
+    add_artists(db, "a")
+    spotify.get_artist_releases.return_value = [release_data("r1")]
+    notifier = MagicMock()
+    notifier.send_release_notification = AsyncMock()
+    monkeypatch.setattr(scheduler, "configured_notifiers", lambda: [notifier])
+
+    asyncio.run(scheduler.check_for_new_releases())
+
+    release = db.query(Release).one()
+    assert (release.spotify_id, release.is_new, release.notified) == ("r1", True, True)
+    assert db.query(Artist).one().last_checked is not None
+    notifier.send_release_notification.assert_awaited_once()
 
 
-def test_rate_limit_stops_the_sweep():
-    Session = _session_with_artists("a", "b", "c")
-    calls = []
+def test_known_release_is_not_added_or_notified_again(db, spotify, monkeypatch):
+    add_artists(db, "a")
+    spotify.get_artist_releases.return_value = [release_data("r1")]
+    asyncio.run(scheduler.check_for_new_releases())
 
-    async def rate_limited(artist_id, months_back):
-        calls.append(artist_id)
+    notifier = MagicMock()
+    notifier.send_release_notification = AsyncMock()
+    monkeypatch.setattr(scheduler, "configured_notifiers", lambda: [notifier])
+    asyncio.run(scheduler.check_for_new_releases())
+
+    assert db.query(Release).count() == 1
+    notifier.send_release_notification.assert_not_awaited()
+
+
+def test_one_failing_artist_does_not_stop_the_sweep(db, spotify):
+    add_artists(db, "a", "b", "c")
+    spotify.get_artist_releases.side_effect = [SpotifyServiceError("boom"), [], []]
+
+    asyncio.run(scheduler.check_for_new_releases())
+
+    assert spotify.get_artist_releases.await_count == 3
+
+
+def test_rate_limit_stops_the_sweep(db, spotify):
+    add_artists(db, "a", "b", "c")
+    spotify.get_artist_releases.side_effect = SpotifyRateLimited("limited", 503)
+
+    asyncio.run(scheduler.check_for_new_releases())
+
+    assert spotify.get_artist_releases.await_count == 1
+
+
+def test_stalest_artist_is_checked_first(db, spotify):
+    add_artists(db, "never")
+    add_artists(db, "recent", last_checked=datetime(2026, 2, 1))
+    add_artists(db, "stale", last_checked=datetime(2026, 1, 1))
+
+    asyncio.run(scheduler.check_for_new_releases())
+
+    order = [call.args[0] for call in spotify.get_artist_releases.await_args_list]
+    assert order == ["never", "stale", "recent"]
+
+
+def test_manual_check_holds_the_lock_and_reports_failures(db, spotify):
+    add_artists(db, "a", "b", "c")
+    gate = threading.Event()
+
+    async def blocked(artist_id, months_back):
+        await asyncio.to_thread(gate.wait, 5)
         raise SpotifyRateLimited("limited", 503)
 
-    spotify = MagicMock()
-    spotify.get_artist_releases = rate_limited
-    with patch.object(scheduler, "SessionLocal", Session), \
-            patch.object(scheduler, "SpotifyService", return_value=spotify), \
-            patch.object(scheduler, "configured_notifiers", return_value=[]), \
-            patch.object(scheduler.asyncio, "sleep", AsyncMock()):
-        asyncio.run(scheduler.check_for_new_releases())
+    spotify.get_artist_releases = blocked
 
-    assert len(calls) == 1
+    assert scheduler.start_manual_check() is True
+    assert scheduler.check_status()["running"] is True
+    assert scheduler.start_manual_check() is False
+    scheduler.run_sync_check()  # skipped: the manual check holds the lock
+    assert scheduler.check_status()["running"] is True
 
-
-def test_stalest_artist_is_checked_first():
-    from datetime import datetime
-
-    Session = _session_with_artists("recent", "stale", "never")
-    with Session() as db:
-        db.query(Artist).filter_by(name="recent").update({"last_checked": datetime(2026, 2, 1)})
-        db.query(Artist).filter_by(name="stale").update({"last_checked": datetime(2026, 1, 1)})
-        db.commit()
-
-    calls = []
-
-    async def record(artist_id, months_back):
-        calls.append(artist_id)
-        return []
-
-    spotify = MagicMock()
-    spotify.get_artist_releases = record
-    with patch.object(scheduler, "SessionLocal", Session), \
-            patch.object(scheduler, "SpotifyService", return_value=spotify), \
-            patch.object(scheduler, "configured_notifiers", return_value=[]), \
-            patch.object(scheduler.asyncio, "sleep", AsyncMock()):
-        asyncio.run(scheduler.check_for_new_releases())
-
-    assert calls == ["never", "stale", "recent"]
+    gate.set()
+    wait_until_idle()
+    status = scheduler.check_status()
+    assert (status["new_releases"], status["failed"]) == (0, 3)
 
 
-def test_manual_check_runs_once_and_reports_failures():
-    Session = _session_with_artists("a", "b", "c")
-    release_gate = threading.Event()
+def test_lock_is_released_when_the_check_crashes(session_factory, monkeypatch):
+    monkeypatch.setattr(scheduler, "SessionLocal", MagicMock(side_effect=RuntimeError("no db")))
 
-    async def failing(artist_id, months_back):
-        await asyncio.to_thread(release_gate.wait, 5)
-        raise SpotifyRateLimited("limited", 503)
+    with pytest.raises(RuntimeError):
+        scheduler.run_sync_check()
 
-    spotify = MagicMock()
-    spotify.get_artist_releases = failing
-    with patch.object(scheduler, "SessionLocal", Session), \
-            patch.object(scheduler, "SpotifyService", return_value=spotify), \
-            patch.object(scheduler, "configured_notifiers", return_value=[]):
-        assert scheduler.start_manual_check() is True
-        assert scheduler.check_status()["running"] is True
-        assert scheduler.start_manual_check() is False
-        scheduler.run_sync_check()  # skipped while the manual check holds the lock
-        assert scheduler.check_status()["running"] is True
-
-        release_gate.set()
-        deadline = time.monotonic() + 5
-        while scheduler.check_status()["running"] and time.monotonic() < deadline:
-            time.sleep(0.01)
-
-    assert scheduler.check_status() == {"running": False, "new_releases": 0, "failed": 3}
+    assert scheduler.check_status()["running"] is False
 
 
-def test_hide_seen_releases_setting_filters_latest():
-    Session = _session_with_artists("a")
-    with Session() as db:
-        artist = db.query(Artist).one()
-        today = date.today().isoformat()
-        for name, is_new in (("seen", False), ("unseen", True)):
-            db.add(Release(
-                spotify_id=name, name=name, release_type="album", release_date=today,
-                spotify_url=f"https://x/{name}", total_tracks=1, artist_id=artist.id, is_new=is_new,
-            ))
-        db.commit()
+@pytest.mark.parametrize("check_time, expected", [("07:20", ("7", "20")), ("nonsense", ("9", "0"))])
+def test_scheduler_job_setup(monkeypatch, check_time, expected):
+    from app.config import get_settings
 
-    async def latest_names():
-        with Session() as db:
-            return {r.name for r in await get_latest_releases(limit=100, db=db, _=None)}
+    settings = get_settings().model_copy(update={"release_check_time": check_time, "timezone": "Not/AZone"})
+    monkeypatch.setattr(scheduler, "get_settings", lambda: settings)
+    job_scheduler = MagicMock(running=False)
+    monkeypatch.setattr(scheduler, "scheduler", job_scheduler)
 
-    async def save(value):
-        await update_settings(SettingsUpdate(hide_seen_releases=value), _=None)
-        return (await get_settings_endpoint(_=None))["hide_seen_releases"]
+    scheduler.start_scheduler()
 
-    with tempfile.TemporaryDirectory() as tmp, \
-            patch.dict(os.environ, {"SETTINGS_OVERRIDES_FILE": f"{tmp}/overrides.json"}):
-        get_settings.cache_clear()
-        assert asyncio.run(latest_names()) == {"seen", "unseen"}
-        assert asyncio.run(save(True)) is True
-        assert asyncio.run(latest_names()) == {"unseen"}
-        assert asyncio.run(save(False)) is False
-        assert asyncio.run(latest_names()) == {"seen", "unseen"}
-    get_settings.cache_clear()
-
-
-if __name__ == "__main__":
-    test_long_retry_after_is_capped()
-    test_rate_limit_stops_the_sweep()
-    test_stalest_artist_is_checked_first()
-    test_manual_check_runs_once_and_reports_failures()
-    test_hide_seen_releases_setting_filters_latest()
-    print("ok")
+    kwargs = job_scheduler.add_job.call_args.kwargs
+    fields = {f.name: str(f) for f in kwargs["trigger"].fields}
+    assert (fields["hour"], fields["minute"]) == expected
+    assert str(kwargs["trigger"].timezone) == "UTC"
+    assert kwargs["misfire_grace_time"] == 3600
+    job_scheduler.start.assert_called_once()
