@@ -3,6 +3,7 @@ import asyncio
 import os
 import tempfile
 import threading
+import time
 from datetime import date
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -108,6 +109,33 @@ def test_stalest_artist_is_checked_first():
     assert calls == ["never", "stale", "recent"]
 
 
+def test_manual_check_runs_once_and_reports_failures():
+    Session = _session_with_artists("a", "b", "c")
+    release_gate = threading.Event()
+
+    async def failing(artist_id, months_back):
+        await asyncio.to_thread(release_gate.wait, 5)
+        raise SpotifyRateLimited("limited", 503)
+
+    spotify = MagicMock()
+    spotify.get_artist_releases = failing
+    with patch.object(scheduler, "SessionLocal", Session), \
+            patch.object(scheduler, "SpotifyService", return_value=spotify), \
+            patch.object(scheduler, "configured_notifiers", return_value=[]):
+        assert scheduler.start_manual_check() is True
+        assert scheduler.check_status()["running"] is True
+        assert scheduler.start_manual_check() is False
+        scheduler.run_sync_check()  # skipped while the manual check holds the lock
+        assert scheduler.check_status()["running"] is True
+
+        release_gate.set()
+        deadline = time.monotonic() + 5
+        while scheduler.check_status()["running"] and time.monotonic() < deadline:
+            time.sleep(0.01)
+
+    assert scheduler.check_status() == {"running": False, "new_releases": 0, "failed": 3}
+
+
 def test_hide_seen_releases_setting_filters_latest():
     Session = _session_with_artists("a")
     with Session() as db:
@@ -143,5 +171,6 @@ if __name__ == "__main__":
     test_long_retry_after_is_capped()
     test_rate_limit_stops_the_sweep()
     test_stalest_artist_is_checked_first()
+    test_manual_check_runs_once_and_reports_failures()
     test_hide_seen_releases_setting_filters_latest()
     print("ok")

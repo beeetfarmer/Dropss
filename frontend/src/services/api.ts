@@ -135,6 +135,11 @@ export const releaseAPI = {
   markAllSeen: () =>
     apiFetch<{ message: string }>("/releases/mark-all-seen", { method: "POST" }),
 
+  refreshAll: () => apiFetch<{ started: boolean }>("/releases/refresh", { method: "POST" }),
+
+  getRefreshStatus: () =>
+    apiFetch<{ running: boolean; new_releases: number; failed: number }>("/releases/refresh"),
+
   getStats: () => apiFetch<ApiStats>("/releases/stats"),
 
   getTracks: (releaseId: number) =>

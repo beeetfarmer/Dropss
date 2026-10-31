@@ -16,6 +16,7 @@ import {
   useMarkAllSeen,
   useUnfollowArtist,
   useRefreshArtist,
+  useRefreshAllReleases,
 } from "@/hooks/use-api";
 import { useLibraryCheck } from "@/hooks/use-library-check";
 import { integrationAPI } from "@/services/api";
@@ -46,6 +47,7 @@ const Index = () => {
   const markAllSeen = useMarkAllSeen();
   const unfollowArtist = useUnfollowArtist();
   const refreshArtist = useRefreshArtist();
+  const refreshAll = useRefreshAllReleases();
 
   const jellyfinCheck = useLibraryCheck({ checkFn: integrationAPI.checkJellyfin, serviceName: "Jellyfin" });
   const plexCheck = useLibraryCheck({ checkFn: integrationAPI.checkPlex, serviceName: "Plex" });
@@ -84,6 +86,17 @@ const Index = () => {
           return next;
         }),
       );
+  };
+
+  const handleRefreshAll = () => {
+    refreshAll
+      .mutateAsync()
+      .then(({ new_releases, failed }) => {
+        const found = `${new_releases} new releases found`;
+        if (failed) toast.warning(`${found}, but some artists could not be checked`);
+        else toast.success(found);
+      })
+      .catch((e: Error) => toast.error(`Refresh failed: ${e.message}`));
   };
 
   const jellyfinAvailable = integrationStatus?.jellyfin_available ?? false;
@@ -128,6 +141,8 @@ const Index = () => {
                 isLoading={releasesLoading}
                 onMarkSeen={handleMarkSeen}
                 onMarkAllSeen={handleMarkAllSeen}
+                onRefreshAll={handleRefreshAll}
+                isRefreshingAll={refreshAll.isPending}
                 onCheckAllJellyfin={() => jellyfinCheck.run(releases)}
                 onCheckAllPlex={() => plexCheck.run(releases)}
                 onCheckAllNavidrome={() => navidromeCheck.run(releases)}

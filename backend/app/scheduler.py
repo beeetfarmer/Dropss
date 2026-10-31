@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import threading
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime
@@ -14,12 +15,19 @@ from .config import get_settings
 scheduler = BackgroundScheduler()
 logger = logging.getLogger(__name__)
 
+# Scheduled and manual checks share this, so they never sweep at the same time.
+_check_lock = threading.Lock()
+_last_check = {"new_releases": 0, "failed": 0}
+
 
 async def check_for_new_releases():
     logger.info("[%s] Starting daily release check", datetime.now())
 
     from .config import get_settings
     current_settings = get_settings()
+
+    total_new = 0
+    failed = 0
 
     db = SessionLocal()
     try:
@@ -28,15 +36,13 @@ async def check_for_new_releases():
 
         if not artists:
             logger.info("No artists to check")
-            return
+            return total_new, failed
 
         spotify = SpotifyService()
 
         notifiers = configured_notifiers()
 
-        total_new = 0
-
-        for artist in artists:
+        for checked, artist in enumerate(artists):
             # Pace the sweep so paging every artist's discography doesn't burst
             # past Spotify's rolling rate-limit window.
             # ponytail: fixed 1s/artist; switch to Retry-After-aware backoff if still throttled
@@ -94,32 +100,56 @@ async def check_for_new_releases():
             except SpotifyRateLimited:
                 logger.warning("Spotify rate limit reached at %s; stopping this release check", artist.name)
                 db.rollback()
+                failed += len(artists) - checked
                 break
 
             except Exception as e:
                 logger.exception("Error checking %s: %s", artist.name, e)
                 db.rollback()
+                failed += 1
 
         logger.info("Release check complete. Found %d new release(s) total", total_new)
 
     except Exception as e:
         logger.exception("Error during release check: %s", e)
         db.rollback()
+        failed = max(failed, 1)
 
     finally:
         db.close()
 
+    return total_new, failed
 
-def run_sync_check():
-    import asyncio
 
+def _run_check_and_release():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
     try:
-        loop.run_until_complete(check_for_new_releases())
+        new_releases, failed = loop.run_until_complete(check_for_new_releases())
+        _last_check.update(new_releases=new_releases, failed=failed)
     finally:
         loop.close()
+        _check_lock.release()
+
+
+def run_sync_check():
+    if _check_lock.acquire(blocking=False):
+        _run_check_and_release()
+    else:
+        logger.warning("Skipping scheduled release check: one is already running")
+
+
+def start_manual_check() -> bool:
+    """Start a check in the background; False if one is already running."""
+    if not _check_lock.acquire(blocking=False):
+        return False
+    threading.Thread(target=_run_check_and_release, daemon=True).start()
+    return True
+
+
+def check_status() -> dict:
+    return {"running": _check_lock.locked(), **_last_check}
 
 
 def start_scheduler():

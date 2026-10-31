@@ -173,6 +173,29 @@ export function useRefreshArtist() {
   });
 }
 
+export function useRefreshAllReleases() {
+  const qc = useQueryClient();
+  return useMutation({
+    // The sweep is paced per artist, so it outlives any single request: start
+    // it, then poll. If a check is already running this just waits for that one.
+    mutationFn: async () => {
+      await releaseAPI.refreshAll();
+      for (;;) {
+        const status = await releaseAPI.getRefreshStatus();
+        if (!status.running) return status;
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+    },
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: keys.followedArtists }),
+        qc.invalidateQueries({ queryKey: keys.latestReleases }),
+        qc.invalidateQueries({ queryKey: keys.allReleases }),
+        qc.invalidateQueries({ queryKey: keys.stats }),
+      ]),
+  });
+}
+
 export function useImportLastFm() {
   const qc = useQueryClient();
   return useMutation({

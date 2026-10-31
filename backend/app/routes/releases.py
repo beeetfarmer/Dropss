@@ -7,6 +7,7 @@ from ..models import Release, Artist
 from ..schemas.release import ReleaseResponse
 from ..services.spotify_service import SpotifyService
 from ..rate_limit import rate_limit
+from ..scheduler import check_status, start_manual_check
 from ..security import require_authenticated_request, require_write_request
 
 router = APIRouter(
@@ -109,6 +110,21 @@ async def mark_all_releases_as_seen(
     db.commit()
 
     return {"message": f"Marked {count} releases as seen"}
+
+
+@router.post("/refresh")
+async def refresh_all_releases(
+    __: None = Depends(require_write_request),
+    _: None = Depends(rate_limit(max_requests=5, window_seconds=60)),
+):
+    return {"started": start_manual_check()}
+
+
+@router.get("/refresh")
+async def get_refresh_status(
+    _: None = Depends(rate_limit(max_requests=120, window_seconds=60)),
+):
+    return check_status()
 
 
 @router.get("/stats")
