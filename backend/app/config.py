@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 from functools import lru_cache
 from .settings_store import load_overrides
 
-APP_VERSION = "0.3.0"
+APP_VERSION = "0.4.0"
 
 
 class Settings(BaseSettings):
