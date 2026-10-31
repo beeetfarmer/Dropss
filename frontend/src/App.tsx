@@ -10,6 +10,7 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import { authAPI } from "./services/api";
+import { RefreshAllProvider } from "./components/RefreshAll";
 
 const queryClient = new QueryClient();
 
@@ -43,36 +44,38 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route
-              path="/login"
-              element={
-                !authEnabled || authState === "authenticated" ? (
-                  <Navigate to="/" replace />
-                ) : (
-                  <Login onAuthenticated={() => setAuthState("authenticated")} />
-                )
-              }
-            />
-            <Route
-              path="/"
-              element={!authEnabled || authState === "authenticated" ? <Index /> : <Navigate to="/login" replace />}
-            />
-            <Route
-              path="/artist/:id"
-              element={!authEnabled || authState === "authenticated" ? <ArtistDetail /> : <Navigate to="/login" replace />}
-            />
-            <Route
-              path="/settings"
-              element={!authEnabled || authState === "authenticated" ? <Settings /> : <Navigate to="/login" replace />}
-            />
-            <Route
-              path="*"
-              element={!authEnabled || authState === "authenticated" ? <NotFound /> : <Navigate to="/login" replace />}
-            />
-          </Routes>
-        </BrowserRouter>
+        <RefreshAllProvider enabled={!authEnabled || authState === "authenticated"}>
+          <BrowserRouter>
+            <Routes>
+              <Route
+                path="/login"
+                element={
+                  !authEnabled || authState === "authenticated" ? (
+                    <Navigate to="/" replace />
+                  ) : (
+                    <Login onAuthenticated={() => setAuthState("authenticated")} />
+                  )
+                }
+              />
+              <Route
+                path="/"
+                element={!authEnabled || authState === "authenticated" ? <Index /> : <Navigate to="/login" replace />}
+              />
+              <Route
+                path="/artist/:id"
+                element={!authEnabled || authState === "authenticated" ? <ArtistDetail /> : <Navigate to="/login" replace />}
+              />
+              <Route
+                path="/settings"
+                element={!authEnabled || authState === "authenticated" ? <Settings /> : <Navigate to="/login" replace />}
+              />
+              <Route
+                path="*"
+                element={!authEnabled || authState === "authenticated" ? <NotFound /> : <Navigate to="/login" replace />}
+              />
+            </Routes>
+          </BrowserRouter>
+        </RefreshAllProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

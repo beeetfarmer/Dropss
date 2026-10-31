@@ -1,4 +1,3 @@
-"""Run: python -m tests.test_spotify_account (from backend/)."""
 import json
 import time
 from unittest.mock import patch
@@ -98,17 +97,3 @@ def test_loopback_origins_are_aliases():
         allowed = _allowed_origins()
     assert {"http://127.0.0.1:8093", "http://[::1]:8093", "https://dropss.example.com"} <= allowed
     assert "http://127.0.0.1:9999" not in allowed and "https://127.0.0.1" not in allowed
-
-
-if __name__ == "__main__":
-    test_plan_skips_tracks_already_in_playlist()
-    test_plan_album_wins_within_one_batch()
-    test_plan_album_replaces_earlier_single()
-    test_plan_single_never_replaces_album_and_versions_stay_distinct()
-    test_sync_respects_release_type_filter()
-    test_loopback_origins_are_aliases()
-    test_state_roundtrip_and_tamper()
-    test_state_expires()
-    test_token_encrypted_at_rest()
-    test_redirect_uri_validation()
-    print("ok")

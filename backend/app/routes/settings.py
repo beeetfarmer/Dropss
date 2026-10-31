@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -49,8 +50,10 @@ class SettingsUpdate(BaseModel):
     navidrome_username: Optional[str] = None
     navidrome_password: Optional[str] = None
     release_check_time: Optional[str] = None
+    library_check_time: Optional[str] = None
     timezone: Optional[str] = None
     release_months_back: Optional[int] = None
+    hide_seen_releases: Optional[bool] = None
 
 
 class ApiKeyCreateRequest(BaseModel):
@@ -71,10 +74,15 @@ def _mask_secret(value: str) -> str:
     return f"{'•' * 12}{value[-4:]}"
 
 
+TIME_FIELDS = {"release_check_time", "library_check_time"}
+TIME_FORMAT = re.compile(r"^([01]?\d|2[0-3]):[0-5]\d$")
+
 APP_DEFAULTS = {
     "release_check_time": "09:00",
+    "library_check_time": "",
     "timezone": "UTC",
     "release_months_back": 3,
+    "hide_seen_releases": False,
 }
 
 
@@ -109,7 +117,7 @@ async def get_settings_endpoint(_: None = Depends(rate_limit(max_requests=60, wi
         "jellyfin_url", "jellyfin_api_key",
         "plex_url", "plex_token",
         "navidrome_url", "navidrome_username", "navidrome_password",
-        "release_check_time", "timezone", "release_months_back",
+        "release_check_time", "library_check_time", "timezone", "release_months_back", "hide_seen_releases",
     ]
 
     result = {}
@@ -151,6 +159,8 @@ async def update_settings(
 
     url_fields = {"gotify_url", "ntfy_url", "jellyfin_url", "plex_url", "navidrome_url"}
     for key, value in update_dict.items():
+        if key in TIME_FIELDS and value and not TIME_FORMAT.match(value):
+            raise HTTPException(status_code=400, detail=f"{key} must be a 24-hour time like 09:00")
         if key in url_fields and value:
             try:
                 validate_outbound_url(value, key)
@@ -165,7 +175,7 @@ async def update_settings(
 
     get_app_settings.cache_clear()
 
-    schedule_fields = {"release_check_time", "timezone"}
+    schedule_fields = TIME_FIELDS | {"timezone"}
     if schedule_fields & set(update_dict.keys()):
         from ..scheduler import start_scheduler
         start_scheduler()

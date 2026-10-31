@@ -29,12 +29,14 @@ interface FollowedArtistsProps {
   isLoading?: boolean;
   onUnfollow: (id: number) => void;
   onRefresh: (id: number) => void;
+  onRefreshAll: () => void;
+  isRefreshingAll: boolean;
   refreshingIds?: Set<number>;
   searchQuery: string;
   integrationStatus?: ApiIntegrationStatus;
 }
 
-const FollowedArtists = ({ artists, isLoading, onUnfollow, onRefresh, refreshingIds, searchQuery, integrationStatus }: FollowedArtistsProps) => {
+const FollowedArtists = ({ artists, isLoading, onUnfollow, onRefresh, onRefreshAll, isRefreshingAll, refreshingIds, searchQuery, integrationStatus }: FollowedArtistsProps) => {
   const navigate = useNavigate();
   const [artistSearch, setArtistSearch] = useState("");
   const [searchSubmitted, setSearchSubmitted] = useState("");
@@ -217,6 +219,12 @@ const FollowedArtists = ({ artists, isLoading, onUnfollow, onRefresh, refreshing
               className="h-9 rounded-full border-white/[0.07] bg-white/[0.03] pl-8 text-xs focus-visible:border-primary/40 focus-visible:ring-0"
             />
           </div>
+          <button
+            onClick={onRefreshAll}
+            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-white/[0.07] bg-white/[0.03] px-3.5 text-xs font-medium transition-colors hover:border-white/[0.14] hover:bg-white/[0.06] [&_svg]:size-3.5 [&_svg]:text-muted-foreground"
+          >
+            {isRefreshingAll ? <Loader2 className="animate-spin" /> : <RefreshCw />} Refresh all
+          </button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <button className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-destructive/30 px-3.5 text-xs text-destructive transition-colors hover:bg-destructive/10">

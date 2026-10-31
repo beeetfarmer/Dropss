@@ -106,7 +106,7 @@ export default function CheckProgressDialog({
   );
 }
 
-const Summary = ({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) => (
+export const Summary = ({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) => (
   <div className="flex flex-col items-center gap-1 rounded-xl bg-white/[0.03] py-2">
     {icon}
     <span className="font-mono text-lg leading-none">{value}</span>

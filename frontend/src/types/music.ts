@@ -170,6 +170,18 @@ export interface ApiSpotifyAccount {
 
 export type SpotifyPlaylistType = "album" | "single";
 
+export interface ApiRefreshStatus {
+  running: boolean;
+  cancelling: boolean;
+  total: number;
+  checked: number;
+  current: string | null;
+  new_releases: number;
+  failed: number;
+  cancelled: boolean;
+  finished: boolean;
+}
+
 export interface ApiLastFmImportResult {
   total_artists: number;
   new_artists: number;
@@ -228,6 +240,6 @@ export interface ApiKeyCreateResponse extends ApiKeyItem {
   api_key: string;
 }
 
-export type ApiSettingsValue = string | number;
+export type ApiSettingsValue = string | number | boolean;
 export type ApiSettings = Record<string, ApiSettingsValue>;
 export type ApiSettingsUpdate = Partial<ApiSettings>;

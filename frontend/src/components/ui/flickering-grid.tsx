@@ -61,50 +61,48 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
         squares[i] = Math.random() * maxOpacity
       }
 
-      return { cols, rows, squares, dpr }
+      return { rows, squares, dpr }
     },
     [squareSize, gridGap, maxOpacity]
   )
 
+  const drawSquare = useCallback(
+    (
+      ctx: CanvasRenderingContext2D,
+      index: number,
+      rows: number,
+      opacity: number,
+      dpr: number
+    ) => {
+      const step = squareSize + gridGap
+      const x = Math.round(Math.floor(index / rows) * step * dpr)
+      const y = Math.round((index % rows) * step * dpr)
+      const size = Math.round(squareSize * dpr)
+      ctx.clearRect(x, y, size, size)
+      ctx.fillStyle = `${memoizedColor}${opacity})`
+      ctx.fillRect(x, y, size, size)
+    },
+    [memoizedColor, squareSize, gridGap]
+  )
+
+  // Only the squares that changed are repainted: a full redraw of a wide grid
+  // takes long enough to drop frames from anything else animating on the page.
   const updateSquares = useCallback(
-    (squares: Float32Array, deltaTime: number) => {
+    (
+      ctx: CanvasRenderingContext2D,
+      squares: Float32Array,
+      rows: number,
+      dpr: number,
+      deltaTime: number
+    ) => {
       for (let i = 0; i < squares.length; i++) {
         if (Math.random() < flickerChance * deltaTime) {
           squares[i] = Math.random() * maxOpacity
+          drawSquare(ctx, i, rows, squares[i], dpr)
         }
       }
     },
-    [flickerChance, maxOpacity]
-  )
-
-  const drawGrid = useCallback(
-    (
-      ctx: CanvasRenderingContext2D,
-      width: number,
-      height: number,
-      cols: number,
-      rows: number,
-      squares: Float32Array,
-      dpr: number
-    ) => {
-      ctx.clearRect(0, 0, width, height)
-      ctx.fillStyle = "transparent"
-      ctx.fillRect(0, 0, width, height)
-
-      for (let i = 0; i < cols; i++) {
-        for (let j = 0; j < rows; j++) {
-          const opacity = squares[i * rows + j]
-          ctx.fillStyle = `${memoizedColor}${opacity})`
-          ctx.fillRect(
-            i * (squareSize + gridGap) * dpr,
-            j * (squareSize + gridGap) * dpr,
-            squareSize * dpr,
-            squareSize * dpr
-          )
-        }
-      }
-    },
-    [memoizedColor, squareSize, gridGap]
+    [drawSquare, flickerChance, maxOpacity]
   )
 
   useEffect(() => {
@@ -121,27 +119,28 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
         const newWidth = width || container.clientWidth
         const newHeight = height || container.clientHeight
         setCanvasSize({ width: newWidth, height: newHeight })
-        gridParams = setupCanvas(canvas, newWidth, newHeight)
+        const params = setupCanvas(canvas, newWidth, newHeight)
+        params.squares.forEach((opacity, i) =>
+          drawSquare(ctx, i, params.rows, opacity, params.dpr)
+        )
+        gridParams = params
       }
 
       updateCanvasSize()
 
-      let lastTime = 0
+      let lastTime = performance.now()
       const animate = (time: number) => {
         if (!isInView || !gridParams) return
 
         const deltaTime = (time - lastTime) / 1000
         lastTime = time
 
-        updateSquares(gridParams.squares, deltaTime)
-        drawGrid(
+        updateSquares(
           ctx,
-          canvas.width,
-          canvas.height,
-          gridParams.cols,
-          gridParams.rows,
           gridParams.squares,
-          gridParams.dpr
+          gridParams.rows,
+          gridParams.dpr,
+          deltaTime
         )
         animationFrameId = requestAnimationFrame(animate)
       }
@@ -175,7 +174,7 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
         intersectionObserver.disconnect()
       }
     }
-  }, [setupCanvas, updateSquares, drawGrid, width, height, isInView])
+  }, [setupCanvas, updateSquares, drawSquare, width, height, isInView])
 
   return (
     <div

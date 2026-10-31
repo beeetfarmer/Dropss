@@ -1,5 +1,6 @@
 import type {
   ApiRelease,
+  ApiRefreshStatus,
   ApiArtist,
   ApiArtistSearch,
   ApiStats,
@@ -134,6 +135,12 @@ export const releaseAPI = {
 
   markAllSeen: () =>
     apiFetch<{ message: string }>("/releases/mark-all-seen", { method: "POST" }),
+
+  refreshAll: () => apiFetch<{ started: boolean }>("/releases/refresh", { method: "POST" }),
+
+  getRefreshStatus: () => apiFetch<ApiRefreshStatus>("/releases/refresh"),
+
+  cancelRefresh: () => apiFetch<{ cancelled: boolean }>("/releases/refresh/cancel", { method: "POST" }),
 
   getStats: () => apiFetch<ApiStats>("/releases/stats"),
 

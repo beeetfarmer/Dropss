@@ -1,4 +1,3 @@
-"""Run: python -m tests.test_notifications (from backend/)."""
 import asyncio
 import json
 import threading
@@ -55,10 +54,3 @@ def test_apprise_delivers_and_is_registered():
 def test_bad_apprise_url_fails_cleanly():
     with patch("app.services.apprise_service.get_settings", return_value=Settings(apprise_urls="nonsense")):
         assert asyncio.run(AppriseService().test_connection()) is False
-
-
-if __name__ == "__main__":
-    test_mask_secret()
-    test_apprise_delivers_and_is_registered()
-    test_bad_apprise_url_fails_cleanly()
-    print("ok")

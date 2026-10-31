@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 from functools import lru_cache
 from .settings_store import load_overrides
 
-APP_VERSION = "0.3.0"
+APP_VERSION = "0.4.0"
 
 
 class Settings(BaseSettings):
@@ -55,8 +55,11 @@ class Settings(BaseSettings):
     navidrome_password: str = ""
 
     release_check_time: str = "09:00"
+    # Daily Jellyfin/Plex/Navidrome check, as HH:MM. Blank turns it off.
+    library_check_time: str = ""
     timezone: str = "UTC"
     release_months_back: int = 3
+    hide_seen_releases: bool = False
 
     class Config:
         env_file = "../.env"
@@ -82,7 +85,7 @@ OVERRIDABLE_FIELDS = {
     "jellyfin_url", "jellyfin_api_key",
     "plex_url", "plex_token",
     "navidrome_url", "navidrome_username", "navidrome_password",
-    "release_check_time", "timezone", "release_months_back",
+    "release_check_time", "library_check_time", "timezone", "release_months_back", "hide_seen_releases",
 }
 
 

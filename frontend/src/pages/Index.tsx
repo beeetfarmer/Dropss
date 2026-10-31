@@ -18,6 +18,7 @@ import {
   useRefreshArtist,
 } from "@/hooks/use-api";
 import { useLibraryCheck } from "@/hooks/use-library-check";
+import { useRefreshAll } from "@/components/RefreshAll";
 import { integrationAPI } from "@/services/api";
 import { toast } from "sonner";
 
@@ -46,6 +47,7 @@ const Index = () => {
   const markAllSeen = useMarkAllSeen();
   const unfollowArtist = useUnfollowArtist();
   const refreshArtist = useRefreshArtist();
+  const refreshAll = useRefreshAll();
 
   const jellyfinCheck = useLibraryCheck({ checkFn: integrationAPI.checkJellyfin, serviceName: "Jellyfin" });
   const plexCheck = useLibraryCheck({ checkFn: integrationAPI.checkPlex, serviceName: "Plex" });
@@ -153,6 +155,8 @@ const Index = () => {
                 isLoading={artistsLoading}
                 onUnfollow={handleUnfollow}
                 onRefresh={handleRefresh}
+                onRefreshAll={refreshAll.start}
+                isRefreshingAll={refreshAll.isRunning}
                 refreshingIds={refreshingIds}
                 searchQuery={searchQuery}
                 integrationStatus={integrationStatus}

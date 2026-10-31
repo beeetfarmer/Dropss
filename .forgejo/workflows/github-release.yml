@@ -1,0 +1,39 @@
+name: Copy release to GitHub
+
+# A release published (or edited) on Forgejo is created or updated on the GitHub mirror with the same
+# tag, title, notes and prerelease flag. Drafts are not copied until they are published.
+# Secret GH_RELEASE_TOKEN: GitHub fine-grained token for beeetfarmer/Dropss with Contents read and write.
+
+on:
+  release:
+    types: [published, edited]
+
+jobs:
+  github:
+    name: Create or update GitHub release
+    runs-on: docker
+    container:
+      image: docker.io/library/alpine:3.22
+    env:
+      GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
+      GH_API: https://api.github.com/repos/beeetfarmer/Dropss/releases
+      TAG: ${{ github.event.release.tag_name }}
+      NAME: ${{ github.event.release.name }}
+      BODY: ${{ github.event.release.body }}
+      PRERELEASE: ${{ github.event.release.prerelease }}
+    steps:
+      - name: Install tools
+        run: apk add --no-cache curl jq
+      - name: Create or update
+        run: |
+          [ -n "$GH_TOKEN" ] || { echo "Set the GH_RELEASE_TOKEN secret"; exit 1; }
+          payload=$(jq -n --arg tag "$TAG" --arg sha "$GITHUB_SHA" --arg name "$NAME" --arg body "$BODY" \
+            --argjson pre "${PRERELEASE:-false}" \
+            '{tag_name: $tag, target_commitish: $sha, name: $name, body: $body, prerelease: $pre}')
+          auth="Authorization: Bearer $GH_TOKEN"
+          id=$(curl -sS -H "$auth" "$GH_API/tags/$TAG" | jq -r '.id // empty')
+          if [ -n "$id" ]; then
+            curl -fsS -X PATCH -H "$auth" -d "$payload" "$GH_API/$id" | jq -r '"updated " + .html_url'
+          else
+            curl -fsS -X POST -H "$auth" -d "$payload" "$GH_API" | jq -r '"created " + .html_url'
+          fi
