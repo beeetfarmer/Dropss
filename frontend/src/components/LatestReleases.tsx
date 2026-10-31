@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Check, CheckCheck, ChevronDown, Loader2, RefreshCw, Server } from "lucide-react";
+import { Check, CheckCheck, ChevronDown, Server } from "lucide-react";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { Release, ReleaseType } from "@/types/music";
 import ReleaseCard from "@/components/ReleaseCard";
@@ -11,8 +11,6 @@ interface LatestReleasesProps {
   isLoading?: boolean;
   onMarkSeen: (id: number) => void;
   onMarkAllSeen: () => void;
-  onRefreshAll: () => void;
-  isRefreshingAll: boolean;
   onCheckAllJellyfin: () => void;
   onCheckAllPlex: () => void;
   onCheckAllNavidrome: () => void;
@@ -103,8 +101,6 @@ const LatestReleases = ({
   isLoading,
   onMarkSeen,
   onMarkAllSeen,
-  onRefreshAll,
-  isRefreshingAll,
   onCheckAllJellyfin,
   onCheckAllPlex,
   onCheckAllNavidrome,
@@ -169,9 +165,6 @@ const LatestReleases = ({
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center gap-2">
-        <ActionPill onClick={onRefreshAll}>
-          {isRefreshingAll ? <Loader2 className="animate-spin" /> : <RefreshCw />} Refresh all
-        </ActionPill>
         <ActionPill onClick={onMarkAllSeen}><CheckCheck /> Mark all seen</ActionPill>
         {jellyfinAvailable && <ActionPill onClick={onCheckAllJellyfin}><Server /> Check Jellyfin</ActionPill>}
         {plexAvailable && <ActionPill onClick={onCheckAllPlex}><Server /> Check Plex</ActionPill>}

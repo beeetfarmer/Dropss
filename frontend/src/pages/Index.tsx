@@ -130,8 +130,6 @@ const Index = () => {
                 isLoading={releasesLoading}
                 onMarkSeen={handleMarkSeen}
                 onMarkAllSeen={handleMarkAllSeen}
-                onRefreshAll={refreshAll.start}
-                isRefreshingAll={refreshAll.isRunning}
                 onCheckAllJellyfin={() => jellyfinCheck.run(releases)}
                 onCheckAllPlex={() => plexCheck.run(releases)}
                 onCheckAllNavidrome={() => navidromeCheck.run(releases)}
@@ -157,6 +155,8 @@ const Index = () => {
                 isLoading={artistsLoading}
                 onUnfollow={handleUnfollow}
                 onRefresh={handleRefresh}
+                onRefreshAll={refreshAll.start}
+                isRefreshingAll={refreshAll.isRunning}
                 refreshingIds={refreshingIds}
                 searchQuery={searchQuery}
                 integrationStatus={integrationStatus}

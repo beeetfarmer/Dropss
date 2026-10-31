@@ -14,7 +14,6 @@ const renderReleases = (props: Partial<ComponentProps<typeof LatestReleases>> = 
   const handlers = {
     onMarkSeen: vi.fn(),
     onMarkAllSeen: vi.fn(),
-    onRefreshAll: vi.fn(),
     onCheckAllJellyfin: vi.fn(),
     onCheckAllPlex: vi.fn(),
     onCheckAllNavidrome: vi.fn(),
@@ -25,7 +24,6 @@ const renderReleases = (props: Partial<ComponentProps<typeof LatestReleases>> = 
         makeRelease({ id: 1, name: "Old Album", artistName: "First", isNew: false, releaseDate: "2026-01-01" }),
         makeRelease({ id: 2, name: "New Single", artistName: "Second", isNew: true, type: "single", releaseDate: "2026-02-01" }),
       ]}
-      isRefreshingAll={false}
       searchQuery=""
       jellyfinAvailable={false}
       plexAvailable={false}
@@ -38,24 +36,18 @@ const renderReleases = (props: Partial<ComponentProps<typeof LatestReleases>> = 
 };
 
 describe("LatestReleases", () => {
-  it("runs the refresh and mark-all actions", () => {
-    const { onRefreshAll, onMarkAllSeen } = renderReleases();
+  it("runs the mark-all action", () => {
+    const { onMarkAllSeen } = renderReleases();
 
-    fireEvent.click(screen.getByRole("button", { name: "Refresh all" }));
     fireEvent.click(screen.getByRole("button", { name: "Mark all seen" }));
 
-    expect(onRefreshAll).toHaveBeenCalledOnce();
     expect(onMarkAllSeen).toHaveBeenCalledOnce();
   });
 
-  it("keeps refresh clickable while running so the progress can be reopened", () => {
-    const { onRefreshAll } = renderReleases({ isRefreshingAll: true });
-    const button = screen.getByRole("button", { name: "Refresh all" });
+  it("leaves refresh all to the artists tab", () => {
+    renderReleases();
 
-    expect(button.querySelector(".animate-spin")).not.toBeNull();
-    fireEvent.click(button);
-
-    expect(onRefreshAll).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("button", { name: "Refresh all" })).not.toBeInTheDocument();
   });
 
   it("filters by search across release and artist names", () => {
