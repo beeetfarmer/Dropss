@@ -21,6 +21,10 @@ class SpotifyServiceError(Exception):
         self.status_code = status_code
 
 
+class SpotifyRateLimited(SpotifyServiceError):
+    """Spotify is still throttling after retries; further calls will fail too."""
+
+
 def _describe_spotify_error(exc: Exception) -> SpotifyServiceError:
     if isinstance(exc, SpotifyOauthError):
         return SpotifyServiceError(
@@ -33,12 +37,25 @@ def _describe_spotify_error(exc: Exception) -> SpotifyServiceError:
         # spotipy prefixes msg with the full request URL; keep only the reason.
         upstream = (exc.msg or "").split("\n")[-1].strip() or "Spotify rejected the request."
         if exc.http_status == 429:
-            return SpotifyServiceError("Spotify rate limit reached. Try again shortly.", 503)
+            return SpotifyRateLimited("Spotify rate limit reached. Try again shortly.", 503)
         if exc.http_status in (401, 403):
             return SpotifyServiceError(f"Spotify denied the request: {upstream}", 502)
         return SpotifyServiceError(f"Spotify error ({exc.http_status}): {upstream}", 502)
 
     return SpotifyServiceError(f"Could not reach Spotify: {exc}", 502)
+
+
+# Longest Retry-After we wait out. urllib3's own cap is 6h per retry, and a
+# throttled app can be told to wait for hours: three retries of that held the
+# daily check past its next run. Anything longer now surfaces as a 429.
+MAX_RETRY_AFTER_SECONDS = 30
+
+
+def build_client(auth_manager) -> spotipy.Spotify:
+    client = spotipy.Spotify(auth_manager=auth_manager, requests_timeout=10)
+    for adapter in client._session.adapters.values():
+        adapter.max_retries.retry_after_max = MAX_RETRY_AFTER_SECONDS
+    return client
 
 
 class SpotifyService:
@@ -55,10 +72,7 @@ class SpotifyService:
         # to_thread wrapping on every call below keeps any backoff off the event
         # loop, so it can no longer freeze the app the way retries=0 was meant to
         # avoid. requests_timeout just caps a genuinely hung socket.
-        self.client = spotipy.Spotify(
-            auth_manager=auth_manager,
-            requests_timeout=10,
-        )
+        self.client = build_client(auth_manager)
 
     async def search_artists(self, query: str, limit: int = 10) -> List[ArtistSearch]:
         try:

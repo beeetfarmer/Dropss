@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 from .database import SessionLocal
 from .models import Artist, Release
-from .services.spotify_service import SpotifyService
+from .services.spotify_service import SpotifyRateLimited, SpotifyService
 from .services.notifications import configured_notifiers, notify_new_releases
 from .config import get_settings
 
@@ -23,7 +23,8 @@ async def check_for_new_releases():
 
     db = SessionLocal()
     try:
-        artists = db.query(Artist).all()
+        # Stalest first, so a sweep cut short by a rate limit resumes where it stopped.
+        artists = db.query(Artist).order_by(Artist.last_checked.asc().nullsfirst()).all()
 
         if not artists:
             logger.info("No artists to check")
@@ -90,6 +91,11 @@ async def check_for_new_releases():
                             release.notified = True
                     db.commit()
 
+            except SpotifyRateLimited:
+                logger.warning("Spotify rate limit reached at %s; stopping this release check", artist.name)
+                db.rollback()
+                break
+
             except Exception as e:
                 logger.exception("Error checking %s: %s", artist.name, e)
                 db.rollback()
@@ -135,6 +141,7 @@ def start_scheduler():
         trigger=CronTrigger(hour=hour, minute=minute, timezone=tz),
         id='daily_release_check',
         name='Check for new releases',
+        misfire_grace_time=3600,
         replace_existing=True
     )
 

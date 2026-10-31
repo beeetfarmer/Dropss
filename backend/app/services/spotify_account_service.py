@@ -26,7 +26,7 @@ from ..config import get_settings
 from ..database import SessionLocal
 from ..models import SpotifyAccount
 from ..security import _require_secret_key
-from .spotify_service import SpotifyService
+from .spotify_service import SpotifyService, build_client
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +129,7 @@ async def complete_connection(code: str, redirect_uri: str) -> SpotifyAccount:
     pending: dict = {}
     oauth = _oauth(redirect_uri, _DbTokenCache(pending=pending))
     await asyncio.to_thread(oauth.get_access_token, code, as_dict=False, check_cache=False)
-    me = await asyncio.to_thread(spotipy.Spotify(auth_manager=oauth, requests_timeout=10).me)
+    me = await asyncio.to_thread(build_client(oauth).me)
 
     with SessionLocal() as db:
         row = db.get(SpotifyAccount, 1) or SpotifyAccount(id=1)
@@ -163,7 +163,7 @@ def user_client() -> Optional[spotipy.Spotify]:
     account = get_account()
     if not account:
         return None
-    return spotipy.Spotify(auth_manager=_oauth(account.redirect_uri, _DbTokenCache()), requests_timeout=10)
+    return build_client(_oauth(account.redirect_uri, _DbTokenCache()))
 
 
 # --- playlists -------------------------------------------------------------
