@@ -11,7 +11,9 @@ ARG VITE_API_BASE_URL=/api
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 RUN npm run build
 
-FROM docker.io/nginxinc/nginx-unprivileged:1.27-alpine
+# A rolling tag on purpose: a version tag stops getting patches once that branch
+# ends, and scanners miss it because nginx comes from nginx.org, not Alpine.
+FROM docker.io/nginxinc/nginx-unprivileged:stable-alpine
 
 USER root
 RUN apk --no-cache upgrade
