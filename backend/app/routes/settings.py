@@ -51,6 +51,7 @@ class SettingsUpdate(BaseModel):
     release_check_time: Optional[str] = None
     timezone: Optional[str] = None
     release_months_back: Optional[int] = None
+    hide_seen_releases: Optional[bool] = None
 
 
 class ApiKeyCreateRequest(BaseModel):
@@ -75,6 +76,7 @@ APP_DEFAULTS = {
     "release_check_time": "09:00",
     "timezone": "UTC",
     "release_months_back": 3,
+    "hide_seen_releases": False,
 }
 
 
@@ -109,7 +111,7 @@ async def get_settings_endpoint(_: None = Depends(rate_limit(max_requests=60, wi
         "jellyfin_url", "jellyfin_api_key",
         "plex_url", "plex_token",
         "navidrome_url", "navidrome_username", "navidrome_password",
-        "release_check_time", "timezone", "release_months_back",
+        "release_check_time", "timezone", "release_months_back", "hide_seen_releases",
     ]
 
     result = {}

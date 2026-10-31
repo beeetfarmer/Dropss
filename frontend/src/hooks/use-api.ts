@@ -233,6 +233,7 @@ export function useUpdateSettings() {
     mutationFn: (settings: ApiSettingsUpdate) => settingsAPI.update(settings),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.settings });
+      qc.invalidateQueries({ queryKey: keys.latestReleases });
       qc.invalidateQueries({ queryKey: keys.integrationStatus });
       qc.invalidateQueries({ queryKey: keys.integrationHealth });
     },

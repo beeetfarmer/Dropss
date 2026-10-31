@@ -65,6 +65,9 @@ async def get_latest_releases(
         .order_by(Release.release_date.desc())
     )
 
+    if settings.hide_seen_releases:
+        query = query.filter(Release.is_new == True)
+
     query = query.limit(limit)
 
     releases = query.all()

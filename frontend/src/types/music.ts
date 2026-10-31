@@ -228,6 +228,6 @@ export interface ApiKeyCreateResponse extends ApiKeyItem {
   api_key: string;
 }
 
-export type ApiSettingsValue = string | number;
+export type ApiSettingsValue = string | number | boolean;
 export type ApiSettings = Record<string, ApiSettingsValue>;
 export type ApiSettingsUpdate = Partial<ApiSettings>;

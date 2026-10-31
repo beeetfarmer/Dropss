@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import AppShell from "@/components/AppShell";
 import SpotifyPlaylistSync from "@/components/SpotifyPlaylistSync";
 import { useSearchParams } from "react-router-dom";
@@ -20,8 +21,8 @@ import { toast } from "sonner";
 interface FieldConfig {
   key: string;
   label: string;
-  placeholder: string;
-  type?: "text" | "password" | "number";
+  placeholder?: string;
+  type?: "text" | "password" | "number" | "switch";
   envOnly?: boolean;
 }
 
@@ -98,6 +99,7 @@ const sections: SectionConfig[] = [
       { key: "release_check_time", label: "Release Check Time", placeholder: "09:00 (24-hour format)" },
       { key: "timezone", label: "Timezone", placeholder: "UTC" },
       { key: "release_months_back", label: "Release Months Back", placeholder: "3", type: "number" },
+      { key: "hide_seen_releases", label: "Hide releases marked as seen", type: "switch" },
     ],
   },
 ];
@@ -338,6 +340,8 @@ const Settings = () => {
       const value = formData[key];
       if (key === "release_months_back") {
         changes[key] = parseInt(value) || 3;
+      } else if (key === "hide_seen_releases") {
+        changes[key] = value === "true";
       } else {
         changes[key] = value;
       }
@@ -368,6 +372,15 @@ const Settings = () => {
           const isSecret = field.type === "password";
           const isVisible = visibleSecrets.has(field.key);
           const isDirty = dirty.has(field.key);
+
+          if (field.type === "switch") {
+            return (
+              <div key={field.key} className={cn("flex h-10 items-center justify-between gap-3 self-end rounded-xl border border-white/[0.07] bg-white/[0.03] px-3", isDirty && "border-primary/40")}>
+                <Label htmlFor={field.key} className="text-xs font-normal text-muted-foreground">{field.label}</Label>
+                <Switch id={field.key} checked={formData[field.key] === "true"} onCheckedChange={(checked) => handleChange(field.key, String(checked))} />
+              </div>
+            );
+          }
 
           return (
             <div key={field.key} className="space-y-1.5">

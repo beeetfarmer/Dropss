@@ -1,6 +1,9 @@
 """Run: python -m tests.test_release_check (from backend/)."""
 import asyncio
+import os
+import tempfile
 import threading
+from datetime import date
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -10,8 +13,11 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app import scheduler
+from app.config import get_settings
 from app.database import Base
-from app.models import Artist
+from app.models import Artist, Release
+from app.routes.releases import get_latest_releases
+from app.routes.settings import SettingsUpdate, get_settings_endpoint, update_settings
 from app.services.spotify_service import MAX_RETRY_AFTER_SECONDS, SpotifyRateLimited, build_client
 
 
@@ -102,8 +108,40 @@ def test_stalest_artist_is_checked_first():
     assert calls == ["never", "stale", "recent"]
 
 
+def test_hide_seen_releases_setting_filters_latest():
+    Session = _session_with_artists("a")
+    with Session() as db:
+        artist = db.query(Artist).one()
+        today = date.today().isoformat()
+        for name, is_new in (("seen", False), ("unseen", True)):
+            db.add(Release(
+                spotify_id=name, name=name, release_type="album", release_date=today,
+                spotify_url=f"https://x/{name}", total_tracks=1, artist_id=artist.id, is_new=is_new,
+            ))
+        db.commit()
+
+    async def latest_names():
+        with Session() as db:
+            return {r.name for r in await get_latest_releases(limit=100, db=db, _=None)}
+
+    async def save(value):
+        await update_settings(SettingsUpdate(hide_seen_releases=value), _=None)
+        return (await get_settings_endpoint(_=None))["hide_seen_releases"]
+
+    with tempfile.TemporaryDirectory() as tmp, \
+            patch.dict(os.environ, {"SETTINGS_OVERRIDES_FILE": f"{tmp}/overrides.json"}):
+        get_settings.cache_clear()
+        assert asyncio.run(latest_names()) == {"seen", "unseen"}
+        assert asyncio.run(save(True)) is True
+        assert asyncio.run(latest_names()) == {"unseen"}
+        assert asyncio.run(save(False)) is False
+        assert asyncio.run(latest_names()) == {"seen", "unseen"}
+    get_settings.cache_clear()
+
+
 if __name__ == "__main__":
     test_long_retry_after_is_capped()
     test_rate_limit_stops_the_sweep()
     test_stalest_artist_is_checked_first()
+    test_hide_seen_releases_setting_filters_latest()
     print("ok")

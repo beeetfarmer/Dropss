@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     release_check_time: str = "09:00"
     timezone: str = "UTC"
     release_months_back: int = 3
+    hide_seen_releases: bool = False
 
     class Config:
         env_file = "../.env"
@@ -82,7 +83,7 @@ OVERRIDABLE_FIELDS = {
     "jellyfin_url", "jellyfin_api_key",
     "plex_url", "plex_token",
     "navidrome_url", "navidrome_username", "navidrome_password",
-    "release_check_time", "timezone", "release_months_back",
+    "release_check_time", "timezone", "release_months_back", "hide_seen_releases",
 }
 
 
