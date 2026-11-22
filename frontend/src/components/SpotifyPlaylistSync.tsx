@@ -270,8 +270,8 @@ const SpotifyPlaylistSync = () => {
                 })}
               </div>
               <p className="text-[11px] leading-relaxed text-muted-foreground/80">
-                Songs already in the playlist are skipped. Album versions take priority: when an album arrives, it replaces
-                any single or EP copy of the same song.
+                Songs already in the playlist are skipped, and a track you remove is not added again. Album versions take
+                priority: when an album arrives, it replaces any single or EP copy of the same song.
               </p>
             </div>
           </motion.div>

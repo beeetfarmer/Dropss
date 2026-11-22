@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowUpRight, RefreshCw, UserMinus, Search, AlertTriangle, Loader2, Radio, X, Plus } from "lucide-react";
+import { ArrowUpRight, RefreshCw, UserMinus, Search, AlertTriangle, Loader2, Radio, Headphones, X, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MagicCard } from "@/components/ui/magic-card";
@@ -20,9 +20,23 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useSearchArtists, useFollowArtist, useImportLastFm } from "@/hooks/use-api";
+import { useSearchArtists, useFollowArtist, useImportLastFm, useImportListenBrainz } from "@/hooks/use-api";
+import { LASTFM_PRO_NOTICE } from "@/lib/notices";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+
+const inputCls = "h-10 rounded-xl border-white/[0.07] bg-white/[0.03] text-sm focus-visible:border-primary/40 focus-visible:ring-0";
+
+const LASTFM_PERIODS = [
+  ["7day", "7 Days"], ["1month", "1 Month"], ["3month", "3 Months"],
+  ["6month", "6 Months"], ["12month", "12 Months"], ["overall", "Overall"],
+] as const;
+
+// ListenBrainz reports whole calendar periods, not rolling ones, hence "Last".
+const LISTENBRAINZ_PERIODS = [
+  ["week", "Last week"], ["month", "Last month"], ["quarter", "Last quarter"],
+  ["half_yearly", "Last half-year"], ["year", "Last year"], ["all_time", "All time"],
+] as const;
 
 interface FollowedArtistsProps {
   artists: Artist[];
@@ -41,12 +55,11 @@ const FollowedArtists = ({ artists, isLoading, onUnfollow, onRefresh, onRefreshA
   const [artistSearch, setArtistSearch] = useState("");
   const [searchSubmitted, setSearchSubmitted] = useState("");
   const [filterQuery, setFilterQuery] = useState("");
-  const [lastfmPeriod, setLastfmPeriod] = useState("3month");
-  const [lastfmLimit, setLastfmLimit] = useState("50");
 
   const { data: searchResults, isLoading: searching, error: searchError } = useSearchArtists(searchSubmitted);
   const followArtist = useFollowArtist();
   const importLastFm = useImportLastFm();
+  const importListenBrainz = useImportListenBrainz();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,31 +91,15 @@ const FollowedArtists = ({ artists, isLoading, onUnfollow, onRefresh, onRefreshA
     );
   };
 
-  const handleLastFmImport = () => {
-    importLastFm.mutate(
-      { period: lastfmPeriod, limit: parseInt(lastfmLimit) || 50 },
-      {
-        onSuccess: (data) => {
-          toast.success(
-            `Imported ${data.new_artists} new artist${data.new_artists !== 1 ? "s" : ""} (${data.existing_artists} already following)`
-          );
-        },
-        onError: (e) => toast.error(`Import failed: ${e.message}`),
-      }
-    );
-  };
-
   const filtered = artists.filter(a => {
     const q = (filterQuery || searchQuery).toLowerCase();
     return !q || a.name.toLowerCase().includes(q);
   });
 
-  const inputCls = "h-10 rounded-xl border-white/[0.07] bg-white/[0.03] text-sm focus-visible:border-primary/40 focus-visible:ring-0";
-
   return (
     <div className="space-y-10">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <BlurFade>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <BlurFade className="md:col-span-2 xl:col-span-1">
           <Panel icon={<Search className="size-4" />} title="Find artists on Spotify" hint="Search by name and follow to start tracking releases.">
             <form onSubmit={handleSearch} className="flex gap-2">
               <Input
@@ -167,39 +164,14 @@ const FollowedArtists = ({ artists, isLoading, onUnfollow, onRefresh, onRefreshA
 
         <BlurFade delay={0.06}>
           <Panel icon={<Radio className="size-4" />} title="Import from Last.fm" hint="Follow your most-played artists in one go.">
-            <div className="flex gap-2">
-              <Select value={lastfmPeriod} onValueChange={setLastfmPeriod}>
-                <SelectTrigger className={`${inputCls} w-36`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7day">7 Days</SelectItem>
-                  <SelectItem value="1month">1 Month</SelectItem>
-                  <SelectItem value="3month">3 Months</SelectItem>
-                  <SelectItem value="6month">6 Months</SelectItem>
-                  <SelectItem value="12month">12 Months</SelectItem>
-                  <SelectItem value="overall">Overall</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input
-                type="number"
-                placeholder="Limit"
-                aria-label="Number of artists"
-                value={lastfmLimit}
-                onChange={(e) => setLastfmLimit(e.target.value)}
-                min={1}
-                max={200}
-                className={`${inputCls} w-24 font-mono`}
-              />
-              <Button
-                variant="secondary"
-                className="h-10 flex-1 rounded-xl"
-                onClick={handleLastFmImport}
-                disabled={importLastFm.isPending}
-              >
-                {importLastFm.isPending ? <Loader2 className="size-4 animate-spin" /> : "Import"}
-              </Button>
-            </div>
+            <ImportControls source="Last.fm" periods={LASTFM_PERIODS} defaultPeriod="3month" mutation={importLastFm} />
+            <p className="text-[11px] text-status-partial">{LASTFM_PRO_NOTICE}</p>
+          </Panel>
+        </BlurFade>
+
+        <BlurFade delay={0.12}>
+          <Panel icon={<Headphones className="size-4" />} title="Import from ListenBrainz" hint="Follow your most-played artists in one go.">
+            <ImportControls source="ListenBrainz" periods={LISTENBRAINZ_PERIODS} defaultPeriod="all_time" mutation={importListenBrainz} />
           </Panel>
         </BlurFade>
       </div>
@@ -347,6 +319,66 @@ const FollowedArtists = ({ artists, isLoading, onUnfollow, onRefresh, onRefreshA
           </div>
         )}
       </div>
+    </div>
+  );
+};
+
+interface ImportControlsProps {
+  source: string;
+  periods: readonly (readonly [value: string, label: string])[];
+  defaultPeriod: string;
+  mutation: ReturnType<typeof useImportLastFm>;
+}
+
+const ImportControls = ({ source, periods, defaultPeriod, mutation }: ImportControlsProps) => {
+  const [period, setPeriod] = useState(defaultPeriod);
+  const [limit, setLimit] = useState("50");
+
+  const runImport = () =>
+    mutation.mutate(
+      { period, limit: parseInt(limit) || 50 },
+      {
+        onSuccess: (data) => {
+          toast.success(
+            `Imported ${data.new_artists} new artist${data.new_artists !== 1 ? "s" : ""} (${data.existing_artists} already following)`
+          );
+        },
+        // Long enough to read why Last.fm refused the key.
+        onError: (e) => toast.error(`Import failed: ${e.message}`, { duration: 10000 }),
+      }
+    );
+
+  return (
+    <div className="flex gap-2">
+      <Select value={period} onValueChange={setPeriod}>
+        <SelectTrigger aria-label={`${source} period`} className={`${inputCls} w-36`}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {periods.map(([value, label]) => (
+            <SelectItem key={value} value={value}>{label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Input
+        type="number"
+        placeholder="Limit"
+        aria-label={`Number of ${source} artists`}
+        value={limit}
+        onChange={(e) => setLimit(e.target.value)}
+        min={1}
+        max={200}
+        className={`${inputCls} w-24 font-mono`}
+      />
+      <Button
+        variant="secondary"
+        className="h-10 flex-1 rounded-xl"
+        aria-label={`Import from ${source}`}
+        onClick={runImport}
+        disabled={mutation.isPending}
+      >
+        {mutation.isPending ? <Loader2 className="size-4 animate-spin" /> : "Import"}
+      </Button>
     </div>
   );
 };

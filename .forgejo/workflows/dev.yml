@@ -109,6 +109,10 @@ jobs:
     runs-on: docker
     container:
       image: docker.io/library/docker:28-cli
+    env:
+      # crun 1.31 breaks exec into BuildKit's container under rootless Podman, so let
+      # Podman build directly. Drop once podman-container-tools/podman#30243 is installed.
+      DOCKER_BUILDKIT: "0"
     steps:
       - name: Install git
         run: apk add --no-cache git
@@ -119,10 +123,10 @@ jobs:
           git -c "http.extraheader=Authorization: token $CHECKOUT_TOKEN" fetch -q --depth=1 origin "$GITHUB_SHA"
           git checkout -q FETCH_HEAD
       - name: Build
-        # --load: with Podman, the build otherwise stays in BuildKit's cache and the scan finds no image.
+        # No --load: Podman's own builder always stores the image, and rejects the flag.
         run: |
           for svc in backend frontend; do
-            docker build --pull --load -t "dropss-$svc:ci-$GITHUB_RUN_NUMBER" "$svc"
+            docker build --pull -t "dropss-$svc:ci-$GITHUB_RUN_NUMBER" "$svc"
           done
       - name: Scan images (fail on fixable HIGH or CRITICAL)
         # Streamed in, never through a mounted socket: works the same with Docker and rootless Podman.

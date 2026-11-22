@@ -17,6 +17,11 @@ FROM docker.io/nginxinc/nginx-unprivileged:stable-alpine
 
 USER root
 RUN apk --no-cache upgrade
+# The base pins nginx, so upgrade skips it. Take it from nginx.org, whose key the
+# base trusts: the unprivileged image lags behind nginx's security releases.
+RUN apk add --no-cache --upgrade --repositories-file /dev/null \
+    -X "https://nginx.org/packages/alpine/v$(cut -d. -f1,2 /etc/alpine-release)/main" \
+    $(apk info -q | grep '^nginx')
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html

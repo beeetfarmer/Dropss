@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { releaseAPI, settingsAPI } from "./api";
+import { integrationAPI, releaseAPI, settingsAPI } from "./api";
 
 const fetchMock = vi.fn();
 
@@ -79,5 +79,25 @@ describe("releaseAPI", () => {
     await releaseAPI.getAll(true, 5, 10, 20);
 
     expect(lastCall().url).toContain("/releases/?only_new=true&artist_id=5&limit=10&offset=20");
+  });
+});
+
+describe("artist imports", () => {
+  it.each([
+    ["lastfm", "importLastFm"],
+    ["listenbrainz", "importListenBrainz"],
+  ] as const)("posts the period and limit to %s", async (source, method) => {
+    respond(200, { new_artists: 0 });
+
+    await integrationAPI[method]("week", 25);
+
+    expect(lastCall().url).toBe(`/api/integrations/${source}/import`);
+    expect(JSON.parse(lastCall().init.body as string)).toEqual({ period: "week", limit: 25 });
+  });
+
+  it("passes the Pro explanation through as the error", async () => {
+    respond(403, { detail: "A Last.fm Pro subscription is required" });
+
+    await expect(integrationAPI.importLastFm("overall", 50)).rejects.toThrow("A Last.fm Pro subscription is required");
   });
 });

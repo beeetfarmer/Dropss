@@ -211,17 +211,19 @@ export function useRefetchReleases() {
   };
 }
 
-export function useImportLastFm() {
+function useArtistImport(importArtists: typeof integrationAPI.importLastFm) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ period, limit }: { period: string; limit: number }) =>
-      integrationAPI.importLastFm(period, limit),
+    mutationFn: ({ period, limit }: { period: string; limit: number }) => importArtists(period, limit),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.followedArtists });
       qc.invalidateQueries({ queryKey: keys.stats });
     },
   });
 }
+
+export const useImportLastFm = () => useArtistImport(integrationAPI.importLastFm);
+export const useImportListenBrainz = () => useArtistImport(integrationAPI.importListenBrainz);
 
 export function useCheckAllJellyfin() {
   const qc = useQueryClient();

@@ -15,6 +15,7 @@ from app.config import get_settings
 from app.database import Base, get_db
 from app.main import app
 from app.rate_limit import _REQUEST_LOG
+from app.services import spotify_account_service
 
 
 @pytest.fixture(autouse=True)
@@ -32,6 +33,7 @@ def session_factory(monkeypatch):
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)
     monkeypatch.setattr(scheduler, "SessionLocal", Session)
+    monkeypatch.setattr(spotify_account_service, "SessionLocal", Session)
     return Session
 
 

@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 from functools import lru_cache
 from .settings_store import load_overrides
 
-APP_VERSION = "0.4.0"
+APP_VERSION = "0.5.0"
 
 
 class Settings(BaseSettings):
@@ -43,6 +43,7 @@ class Settings(BaseSettings):
 
     lastfm_api_key: str = ""
     lastfm_username: str = ""
+    listenbrainz_username: str = ""
 
     jellyfin_url: str = ""
     jellyfin_api_key: str = ""
@@ -82,6 +83,7 @@ OVERRIDABLE_FIELDS = {
     "telegram_bot_token", "telegram_chat_id",
     "apprise_urls",
     "lastfm_api_key", "lastfm_username",
+    "listenbrainz_username",
     "jellyfin_url", "jellyfin_api_key",
     "plex_url", "plex_token",
     "navidrome_url", "navidrome_username", "navidrome_password",

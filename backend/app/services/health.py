@@ -2,7 +2,7 @@
 
 Each check answers "is it configured, and does it answer with these credentials?"
 without side effects: nothing here sends a notification. Every check returns
-"ok", "error" or "unconfigured".
+"ok", "error" or "unconfigured"; Last.fm can also return "pro_required".
 """
 import asyncio
 import logging
@@ -14,6 +14,7 @@ from ..config import get_settings
 from .gotify_service import GotifyService
 from .jellyfin_service import JellyfinService
 from .lastfm_service import LastFmService
+from .listenbrainz_service import ListenBrainzService
 from .navidrome_service import NavidromeService
 from .ntfy_service import NtfyService
 from .plex_service import PlexService
@@ -36,13 +37,21 @@ async def _spotify(s) -> bool:
     return bool(await asyncio.to_thread(service.client.auth_manager.get_access_token, as_dict=False, check_cache=False))
 
 
-async def _lastfm(s) -> bool:
+async def _lastfm(s) -> bool | str:
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         response = await client.get(LastFmService.BASE_URL, params={
             "method": "user.getinfo", "user": s.lastfm_username,
             "api_key": s.lastfm_api_key, "format": "json",
         })
-        return response.status_code == 200 and "error" not in response.json()
+        body = LastFmService.read_body(response)
+        if LastFmService.key_refused(response, body):
+            return "pro_required"
+        return response.status_code == 200 and "error" not in body
+
+
+async def _listenbrainz(s) -> bool:
+    lb = ListenBrainzService()
+    return await _get_ok(f"{lb.BASE_URL}/user/{lb.user_path}/listen-count", headers=lb.HEADERS)
 
 
 async def _jellyfin(s) -> bool:
@@ -83,6 +92,7 @@ async def _apprise(s) -> bool:
 CHECKS = {
     "spotify": (lambda s: s.spotify_client_id and s.spotify_client_secret, _spotify),
     "lastfm": (lambda s: s.lastfm_api_key and s.lastfm_username, _lastfm),
+    "listenbrainz": (lambda s: s.listenbrainz_username, _listenbrainz),
     "jellyfin": (lambda s: s.jellyfin_url and s.jellyfin_api_key, _jellyfin),
     "plex": (lambda s: s.plex_url and s.plex_token, _plex),
     "navidrome": (lambda s: s.navidrome_url and s.navidrome_username and s.navidrome_password, _navidrome),
@@ -95,7 +105,10 @@ CHECKS = {
 
 async def _run(name: str, check, settings) -> str:
     try:
-        return "ok" if await asyncio.wait_for(check(settings), TIMEOUT + 1) else "error"
+        result = await asyncio.wait_for(check(settings), TIMEOUT + 1)
+        if isinstance(result, str):
+            return result
+        return "ok" if result else "error"
     except Exception as e:
         # Type only: exception text can embed URLs carrying tokens (e.g. Telegram).
         logger.info("Health check failed for %s: %s", name, type(e).__name__)
