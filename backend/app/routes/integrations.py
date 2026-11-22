@@ -9,7 +9,9 @@ import httpx
 from ..database import get_db
 from ..anomaly import record_anomaly_event
 from ..models import Artist, Release
+from ..services.import_errors import ImportSourceError
 from ..services.lastfm_service import LastFmService
+from ..services.listenbrainz_service import ListenBrainzService, StatsRange
 from ..services.jellyfin_service import JellyfinService
 from ..services.plex_service import PlexService
 from ..services.navidrome_service import NavidromeService
@@ -84,6 +86,7 @@ async def check_integration_status(_: None = Depends(rate_limit(max_requests=30,
     spotify_configured = bool(settings.spotify_client_id and settings.spotify_client_secret)
 
     lastfm_configured = bool(settings.lastfm_api_key and settings.lastfm_username)
+    listenbrainz_configured = bool(settings.listenbrainz_username)
 
     return {
         "jellyfin_available": jellyfin_available,
@@ -95,6 +98,7 @@ async def check_integration_status(_: None = Depends(rate_limit(max_requests=30,
         "apprise_configured": apprise_configured,
         "spotify_configured": spotify_configured,
         "lastfm_configured": lastfm_configured,
+        "listenbrainz_configured": listenbrainz_configured,
         "errors": errors
     }
 
@@ -214,18 +218,6 @@ async def test_telegram_connection(
         raise HTTPException(status_code=500, detail="Telegram test failed")
 
 
-class LastFmImportRequest(BaseModel):
-    period: str = "overall"
-    limit: int = Field(default=50, ge=1, le=200)
-
-
-class LastFmImportResponse(BaseModel):
-    total_artists: int
-    new_artists: int
-    existing_artists: int
-    artists_added: List[str]
-
-
 class JellyfinCheckResponse(BaseModel):
     release_id: int
     in_library: bool
@@ -295,7 +287,12 @@ class LastFmImportRequest(BaseModel):
     limit: int = Field(default=50, ge=1, le=200)
 
 
-class LastFmImportResponse(BaseModel):
+class ListenBrainzImportRequest(BaseModel):
+    period: StatsRange = "all_time"
+    limit: int = Field(default=50, ge=1, le=200)
+
+
+class ArtistImportResponse(BaseModel):
     total_artists: int
     new_artists: int
     existing_artists: int
@@ -329,7 +326,87 @@ class NavidromeCheckResponse(BaseModel):
     missing_tracks: List[str]
 
 
-@router.post("/lastfm/import", response_model=LastFmImportResponse)
+async def _follow_top_artists(db: Session, source: str, source_artists: List[Dict]) -> ArtistImportResponse:
+    spotify = SpotifyService()
+    logger.info("Processing %d artists from %s", len(source_artists), source)
+
+    new_count = 0
+    existing_count = 0
+    artists_added = []
+    skipped = []
+
+    for idx, source_artist in enumerate(source_artists, 1):
+        artist_name = source_artist["name"]
+        logger.info("[%d/%d] Processing artist %s", idx, len(source_artists), artist_name)
+
+        try:
+            existing = db.query(Artist).filter(Artist.name.ilike(artist_name)).first()
+
+            if existing:
+                logger.info("Already following by name: %s", artist_name)
+                existing_count += 1
+                continue
+
+            try:
+                spotify_results = await spotify.search_artists(artist_name, limit=1)
+            except SpotifyServiceError as e:
+                logger.warning("Spotify lookup failed for %s: %s", artist_name, e.message)
+                skipped.append(artist_name)
+                continue
+
+            if not spotify_results:
+                logger.info("Not found on Spotify: %s", artist_name)
+                skipped.append(artist_name)
+                continue
+
+            spotify_artist = spotify_results[0]
+            logger.info("Found on Spotify: %s", spotify_artist.name)
+
+            existing_by_id = db.query(Artist).filter(
+                Artist.spotify_id == spotify_artist.spotify_id
+            ).first()
+
+            if existing_by_id:
+                logger.info("Already following as %s (same Spotify ID)", existing_by_id.name)
+                existing_count += 1
+                continue
+
+            new_artist = Artist(
+                spotify_id=spotify_artist.spotify_id,
+                name=spotify_artist.name,
+                spotify_url=spotify_artist.spotify_url,
+                image_url=spotify_artist.image_url
+            )
+
+            db.add(new_artist)
+            db.flush()
+            artists_added.append(spotify_artist.name)
+            new_count += 1
+
+        except Exception as e:
+            logger.warning("Error processing artist %s: %s", artist_name, e)
+            skipped.append(artist_name)
+            continue
+
+    logger.info("Committing %d new artists to database", new_count)
+    db.commit()
+    logger.info(
+        "%s import complete. New=%d Existing=%d Skipped=%d",
+        source,
+        new_count,
+        existing_count,
+        len(skipped),
+    )
+
+    return ArtistImportResponse(
+        total_artists=len(source_artists),
+        new_artists=new_count,
+        existing_artists=existing_count,
+        artists_added=artists_added
+    )
+
+
+@router.post("/lastfm/import", response_model=ArtistImportResponse)
 async def import_lastfm_artists(
     request: LastFmImportRequest,
     db: Session = Depends(get_db),
@@ -337,89 +414,30 @@ async def import_lastfm_artists(
     _: None = Depends(rate_limit(max_requests=5, window_seconds=60)),
 ):
     try:
-        lastfm = LastFmService()
-        spotify = SpotifyService()
-
-        lastfm_artists = await lastfm.get_top_artists(request.period, request.limit)
-        logger.info("Processing %d artists from Last.fm", len(lastfm_artists))
-
-        new_count = 0
-        existing_count = 0
-        artists_added = []
-        skipped = []
-
-        for idx, lastfm_artist in enumerate(lastfm_artists, 1):
-            artist_name = lastfm_artist["name"]
-            logger.info("[%d/%d] Processing artist %s", idx, len(lastfm_artists), artist_name)
-
-            try:
-                existing = db.query(Artist).filter(Artist.name.ilike(artist_name)).first()
-
-                if existing:
-                    logger.info("Already following by name: %s", artist_name)
-                    existing_count += 1
-                    continue
-
-                try:
-                    spotify_results = await spotify.search_artists(artist_name, limit=1)
-                except SpotifyServiceError as e:
-                    logger.warning("Spotify lookup failed for %s: %s", artist_name, e.message)
-                    skipped.append(artist_name)
-                    continue
-
-                if not spotify_results:
-                    logger.info("Not found on Spotify: %s", artist_name)
-                    skipped.append(artist_name)
-                    continue
-
-                spotify_artist = spotify_results[0]
-                logger.info("Found on Spotify: %s", spotify_artist.name)
-
-                existing_by_id = db.query(Artist).filter(
-                    Artist.spotify_id == spotify_artist.spotify_id
-                ).first()
-
-                if existing_by_id:
-                    logger.info("Already following as %s (same Spotify ID)", existing_by_id.name)
-                    existing_count += 1
-                    continue
-
-                new_artist = Artist(
-                    spotify_id=spotify_artist.spotify_id,
-                    name=spotify_artist.name,
-                    spotify_url=spotify_artist.spotify_url,
-                    image_url=spotify_artist.image_url
-                )
-
-                db.add(new_artist)
-                db.flush()
-                artists_added.append(spotify_artist.name)
-                new_count += 1
-
-            except Exception as e:
-                logger.warning("Error processing artist %s: %s", artist_name, e)
-                skipped.append(artist_name)
-                continue
-
-        logger.info("Committing %d new artists to database", new_count)
-        db.commit()
-        logger.info(
-            "Last.fm import complete. New=%d Existing=%d Skipped=%d",
-            new_count,
-            existing_count,
-            len(skipped),
-        )
-
-        return LastFmImportResponse(
-            total_artists=len(lastfm_artists),
-            new_artists=new_count,
-            existing_artists=existing_count,
-            artists_added=artists_added
-        )
-
+        artists = await LastFmService().get_top_artists(request.period, request.limit)
+        return await _follow_top_artists(db, "Last.fm", artists)
+    except ImportSourceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception:
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to import Last.fm artists")
+
+
+@router.post("/listenbrainz/import", response_model=ArtistImportResponse)
+async def import_listenbrainz_artists(
+    request: ListenBrainzImportRequest,
+    db: Session = Depends(get_db),
+    __: None = Depends(require_write_request),
+    _: None = Depends(rate_limit(max_requests=5, window_seconds=60)),
+):
+    try:
+        artists = await ListenBrainzService().get_top_artists(request.period, request.limit)
+        return await _follow_top_artists(db, "ListenBrainz", artists)
+    except ImportSourceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to import ListenBrainz artists")
 
 
 @router.post("/jellyfin/check/{release_id}", response_model=JellyfinCheckResponse)

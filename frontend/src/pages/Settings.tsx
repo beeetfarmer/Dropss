@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Save, Loader2, RefreshCw, Music, Bell, BellRing, Megaphone, Radio, Server, Clock, Eye, EyeOff, Send, KeyRound, Copy, Trash2 } from "lucide-react";
+import { Save, Loader2, RefreshCw, Music, Bell, BellRing, Megaphone, Radio, Headphones, Server, Clock, Eye, EyeOff, Send, KeyRound, Copy, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ import { MagicCard } from "@/components/ui/magic-card";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
 import { cn } from "@/lib/utils";
+import { LASTFM_PRO_NOTICE } from "@/lib/notices";
 import { useSettings, useUpdateSettings, useIntegrationHealth, useApiKeys, useCreateApiKey, useRevokeApiKey } from "@/hooks/use-api";
 import { integrationAPI } from "@/services/api";
 import type { ApiSettingsUpdate, ApiKeyScope, ApiIntegrationHealth, IntegrationHealth, IntegrationName } from "@/types/music";
@@ -35,6 +36,7 @@ interface SectionConfig {
   testLabel?: string;
   service?: IntegrationName;
   hint?: string;
+  notice?: string;
   extra?: React.ReactNode;
 }
 
@@ -58,6 +60,16 @@ const sections: SectionConfig[] = [
     fields: [
       { key: "lastfm_api_key", label: "API Key", placeholder: "Set via environment", type: "password", envOnly: true },
       { key: "lastfm_username", label: "Username", placeholder: "Your Last.fm username" },
+    ],
+    notice: LASTFM_PRO_NOTICE,
+  },
+  {
+    title: "ListenBrainz",
+    icon: <Headphones className="size-4" />,
+    description: "Import your top artists from your listening history, free and without an API key",
+    service: "listenbrainz",
+    fields: [
+      { key: "listenbrainz_username", label: "Username", placeholder: "Your ListenBrainz username" },
     ],
   },
   {
@@ -165,7 +177,7 @@ const GROUPS: { title: string; icon: React.ReactNode; description: string; provi
     title: "Music sources",
     icon: <Music className="size-4" />,
     description: "Where your artists and listening history come from.",
-    providers: byTitle("Spotify", "Last.fm"),
+    providers: byTitle("Spotify", "Last.fm", "ListenBrainz"),
   },
   {
     title: "Media servers",
@@ -427,6 +439,8 @@ const Settings = () => {
       </div>
 
       {section.hint && <p className="-mt-2 font-mono text-[11px] text-muted-foreground/70">{section.hint}</p>}
+
+      {section.notice && <p className="text-xs text-status-partial">{section.notice}</p>}
 
       {section.testAction && (
         <Button
@@ -700,6 +714,11 @@ const HEALTH_STYLE: Record<IntegrationHealth, { dot: string; pill: string; label
     dot: "bg-status-missing shadow-[0_0_6px] shadow-status-missing",
     pill: "bg-status-missing/10 text-status-missing ring-status-missing/25",
     label: (name) => `Can't reach ${name}`,
+  },
+  pro_required: {
+    dot: "bg-status-partial shadow-[0_0_6px] shadow-status-partial",
+    pill: "bg-status-partial/10 text-status-partial ring-status-partial/25",
+    label: () => "Key refused: Pro required",
   },
   unconfigured: {
     dot: "bg-white/20",

@@ -140,12 +140,13 @@ export interface ApiIntegrationStatus {
   apprise_configured: boolean;
   spotify_configured: boolean;
   lastfm_configured: boolean;
+  listenbrainz_configured: boolean;
   errors: string[];
 }
 
-export type IntegrationHealth = "ok" | "error" | "unconfigured";
+export type IntegrationHealth = "ok" | "error" | "unconfigured" | "pro_required";
 export type IntegrationName =
-  | "spotify" | "lastfm" | "jellyfin" | "plex" | "navidrome"
+  | "spotify" | "lastfm" | "listenbrainz" | "jellyfin" | "plex" | "navidrome"
   | "gotify" | "ntfy" | "telegram" | "apprise";
 export type ApiIntegrationHealth = Record<IntegrationName, IntegrationHealth>;
 
@@ -182,7 +183,7 @@ export interface ApiRefreshStatus {
   finished: boolean;
 }
 
-export interface ApiLastFmImportResult {
+export interface ApiArtistImportResult {
   total_artists: number;
   new_artists: number;
   existing_artists: number;

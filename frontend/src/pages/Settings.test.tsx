@@ -3,17 +3,18 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { ReactNode } from "react";
 import Settings from "./Settings";
-import type { ApiSettings } from "@/types/music";
+import type { ApiIntegrationHealth, ApiSettings } from "@/types/music";
 
 const mutate = vi.fn();
 let settings: ApiSettings;
+let health: Partial<ApiIntegrationHealth> | undefined;
 
 vi.mock("@/components/AppShell", () => ({ default: ({ children }: { children: ReactNode }) => <>{children}</> }));
 vi.mock("@/components/SpotifyPlaylistSync", () => ({ default: () => null }));
 vi.mock("@/hooks/use-api", () => ({
   useSettings: () => ({ data: settings, isLoading: false }),
   useUpdateSettings: () => ({ mutate, isPending: false }),
-  useIntegrationHealth: () => ({ data: undefined, isFetching: false, refetch: vi.fn() }),
+  useIntegrationHealth: () => ({ data: health, isFetching: false, refetch: vi.fn() }),
   useApiKeys: () => ({ data: { items: [] }, isLoading: false }),
   useCreateApiKey: () => ({ mutate: vi.fn(), isPending: false }),
   useRevokeApiKey: () => ({ mutate: vi.fn(), isPending: false }),
@@ -30,6 +31,7 @@ const hideSeen = () => screen.getByRole("switch", { name: "Hide releases marked 
 
 beforeEach(() => {
   mutate.mockReset();
+  health = undefined;
   settings = { hide_seen_releases: false, release_months_back: 3, app_version: "1.2.3" };
 });
 
@@ -96,5 +98,35 @@ describe("Settings", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     expect(mutate.mock.calls[0][0]).toEqual({ release_months_back: 6 });
+  });
+});
+
+describe("listening history settings", () => {
+  it("warns that Last.fm needs Pro", async () => {
+    renderSettings();
+
+    fireEvent.click(screen.getByRole("tab", { name: /Last\.fm/ }));
+
+    expect(await screen.findByText(/Last\.fm Pro subscription required/)).toBeInTheDocument();
+  });
+
+  it("explains a refused Last.fm key instead of calling it unreachable", async () => {
+    health = { lastfm: "pro_required" };
+    renderSettings();
+
+    fireEvent.click(screen.getByRole("tab", { name: /Last\.fm/ }));
+
+    expect(await screen.findByText("Key refused: Pro required")).toBeInTheDocument();
+    expect(screen.queryByText("Can't reach Last.fm")).not.toBeInTheDocument();
+  });
+
+  it("saves the ListenBrainz username", async () => {
+    renderSettings();
+
+    fireEvent.click(screen.getByRole("tab", { name: /ListenBrainz/ }));
+    fireEvent.change(await screen.findByLabelText("Username"), { target: { value: "listener" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(mutate.mock.calls[0][0]).toEqual({ listenbrainz_username: "listener" });
   });
 });

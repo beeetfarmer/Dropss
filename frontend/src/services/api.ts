@@ -6,7 +6,7 @@ import type {
   ApiStats,
   ApiIntegrationStatus,
   ApiIntegrationHealth,
-  ApiLastFmImportResult,
+  ApiArtistImportResult,
   ApiArtistReleases,
   ApiTrack,
   ApiLibraryCheckResult,
@@ -154,7 +154,13 @@ export const integrationAPI = {
   checkHealth: () => apiFetch<ApiIntegrationHealth>("/integrations/health"),
 
   importLastFm: (period: string, limit: number) =>
-    apiFetch<ApiLastFmImportResult>("/integrations/lastfm/import", {
+    apiFetch<ApiArtistImportResult>("/integrations/lastfm/import", {
+      method: "POST",
+      body: JSON.stringify({ period, limit }),
+    }),
+
+  importListenBrainz: (period: string, limit: number) =>
+    apiFetch<ApiArtistImportResult>("/integrations/listenbrainz/import", {
       method: "POST",
       body: JSON.stringify({ period, limit }),
     }),

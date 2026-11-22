@@ -42,6 +42,7 @@ class SettingsUpdate(BaseModel):
     apprise_urls: Optional[str] = None
     lastfm_api_key: Optional[str] = None
     lastfm_username: Optional[str] = None
+    listenbrainz_username: Optional[str] = None
     jellyfin_url: Optional[str] = None
     jellyfin_api_key: Optional[str] = None
     plex_url: Optional[str] = None
@@ -114,6 +115,7 @@ async def get_settings_endpoint(_: None = Depends(rate_limit(max_requests=60, wi
         "telegram_bot_token", "telegram_chat_id",
         "apprise_urls",
         "lastfm_api_key", "lastfm_username",
+        "listenbrainz_username",
         "jellyfin_url", "jellyfin_api_key",
         "plex_url", "plex_token",
         "navidrome_url", "navidrome_username", "navidrome_password",
