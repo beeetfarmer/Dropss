@@ -24,7 +24,7 @@ from spotipy.oauth2 import SpotifyOAuth
 
 from ..config import get_settings
 from ..database import SessionLocal
-from ..models import SpotifyAccount
+from ..models import PlaylistTrack, SpotifyAccount
 from ..security import _require_secret_key
 from .spotify_service import SpotifyService, build_client
 
@@ -230,17 +230,18 @@ def song_key(name: str, artist_ids: list) -> tuple:
     return title, (artist_ids[0] if artist_ids else "")
 
 
-def plan_sync(existing: list[dict], releases: list[dict]) -> tuple[list[str], list[str]]:
+def plan_sync(existing: list[dict], releases: list[dict], history=frozenset()) -> tuple[list[str], list[str]]:
     """Decide what to remove from and add to the playlist.
 
     existing: playlist items as {uri, name, artist_ids, album_type}
     releases: {release_type, tracks: [{id, name, artist_ids}]}, already filtered by type
+    history: uris of tracks that were in the playlist before, which are never added again
 
     Returns (uris_to_remove, uris_to_add). Albums win: releases are processed
     album-first, and an album track replaces a non-album copy of the same song
     already in the playlist. Nothing is ever added twice.
     """
-    present_uris = {item["uri"] for item in existing}
+    present_uris = {item["uri"] for item in existing} | history
     by_song = {song_key(item["name"], item["artist_ids"]): item for item in existing}
     remove, add = [], []
 
@@ -299,6 +300,16 @@ class SpotifyPlaylistSync:
             page = await asyncio.to_thread(client.next, page) if page.get("next") else None
         return items
 
+    def _history(self) -> set[str]:
+        with SessionLocal() as db:
+            rows = db.query(PlaylistTrack).filter_by(playlist_id=self.playlist_id)
+            return {row.track_uri for row in rows}
+
+    def _remember(self, uris):
+        with SessionLocal() as db:
+            db.add_all(PlaylistTrack(playlist_id=self.playlist_id, track_uri=uri) for uri in uris)
+            db.commit()
+
     async def send_release_notification(self, artist_name: str, releases: list) -> bool:
         wanted = [r for r in releases if r.get("release_type") in self.release_types]
         if not wanted:
@@ -312,11 +323,17 @@ class SpotifyPlaylistSync:
                 {"release_type": r["release_type"], "tracks": await catalogue.get_album_tracks(r["spotify_id"])}
                 for r in wanted
             ]
-            remove, add = plan_sync(await self._existing_items(client), prepared)
+            existing = await self._existing_items(client)
+            history = self._history()
+            self._remember({item["uri"] for item in existing} - history)
+            remove, add = plan_sync(existing, prepared, history)
+            # Add before removing, so a failure can leave a duplicate but never lose a song.
+            for i in range(0, len(add), ADD_BATCH):
+                batch = add[i:i + ADD_BATCH]
+                await asyncio.to_thread(client.playlist_add_items, self.playlist_id, batch)
+                self._remember(batch)
             for i in range(0, len(remove), ADD_BATCH):
                 await asyncio.to_thread(client.playlist_remove_all_occurrences_of_items, self.playlist_id, remove[i:i + ADD_BATCH])
-            for i in range(0, len(add), ADD_BATCH):
-                await asyncio.to_thread(client.playlist_add_items, self.playlist_id, add[i:i + ADD_BATCH])
             logger.info(
                 "Spotify playlist sync for %s: %d added, %d replaced by album versions",
                 artist_name, len(add), len(remove),

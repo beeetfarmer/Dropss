@@ -124,7 +124,7 @@ Open `http://localhost:8080`.
 
 ## Spotify playlist sync
 
-Dropss can add every track of each newly found release to a Spotify playlist.
+Dropss can add every track of each newly found release to a Spotify playlist. If you remove a track from the playlist, that same track is not added again.
 
 1. In the [Spotify developer dashboard](https://developer.spotify.com/dashboard), add `<your Dropss URL>/api/spotify/callback` as a Redirect URI. Spotify only accepts `https://` URLs, or `http://127.0.0.1` for local use (`localhost` is rejected), so open Dropss at the same address you register.
 2. Open **Settings → Music sources → Spotify**, click **Connect Spotify account**, then pick or create a playlist.
