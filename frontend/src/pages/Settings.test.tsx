@@ -36,10 +36,23 @@ beforeEach(() => {
 });
 
 describe("Settings", () => {
+  it("lets the page shrink to a phone's width", () => {
+    renderSettings();
+
+    // jsdom has no layout. Without a base column, the grid grows to fit its widest child and overflows.
+    expect(screen.getByRole("main")).toHaveClass("grid-cols-1");
+  });
+
   it("shows the app version", () => {
     renderSettings();
 
     expect(screen.getByText("v1.2.3")).toBeInTheDocument();
+  });
+
+  it("wraps provider tabs instead of hiding them on a narrow screen", () => {
+    renderSettings();
+
+    for (const tabs of screen.getAllByRole("tablist")) expect(tabs).toHaveClass("flex-wrap");
   });
 
   it.each([

@@ -472,7 +472,7 @@ const Settings = () => {
         </BlurFade>
       </section>
 
-      <main className="container grid gap-10 lg:grid-cols-[200px_minmax(0,1fr)]">
+      <main className="container grid grid-cols-1 gap-10 lg:grid-cols-[200px_minmax(0,1fr)]">
         <nav className="hidden lg:block">
           <ul className="sticky top-6 space-y-0.5">
             {navItems.map((title, i) => (
@@ -764,7 +764,7 @@ const ProviderGroup = ({ id, title, icon, description, providers, health, checki
 
   return (
     <SettingsCard id={id} icon={icon} title={title} description={description}>
-      <div role="tablist" aria-label={title} className="relative flex gap-1 overflow-x-auto rounded-xl border border-white/[0.06] bg-black/20 p-1">
+      <div role="tablist" aria-label={title} className="relative flex flex-wrap gap-1 rounded-xl border border-white/[0.06] bg-black/20 p-1">
         {providers.map((p, i) => {
           const selected = i === active;
           const state = p.service ? health?.[p.service] : undefined;
