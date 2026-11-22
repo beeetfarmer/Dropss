@@ -1,7 +1,9 @@
+import asyncio
 import json
 import time
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+import pytest
 from fastapi import HTTPException
 
 from app.routes.spotify_account import _resolve_redirect_uri
@@ -83,8 +85,29 @@ def test_plan_single_never_replaces_album_and_versions_stay_distinct():
     assert remove == [] and add == ["spotify:track:s2", "spotify:track:s3"]
 
 
+@pytest.mark.parametrize("field", ["item", "track"])
+def test_existing_items_reads_current_and_legacy_field(field):
+    # Development Mode apps get "item" since Feb 2026, Extended Quota apps still get "track".
+    track = {"uri": "spotify:track:1", "name": "Song", "artists": [{"id": "A"}], "album": {"album_type": "album"}}
+
+    def playlist_items(playlist_id, fields, **kwargs):
+        # Like Spotify, return only what the fields filter asked for.
+        return {"items": [{field: track} if f"{field}(" in fields else {}], "next": None}
+
+    client = MagicMock()
+    client.playlist_items.side_effect = playlist_items
+    items = asyncio.run(account.SpotifyPlaylistSync("pl", {"album"})._existing_items(client))
+    assert items == [_item("1", "Song", "album")]
+
+
+@pytest.mark.parametrize("entry", [{}, {"item": None}, {"track": None}, {"item": {"uri": "spotify:episode:e"}}, {"item": {"uri": "spotify:local:x"}}])
+def test_existing_items_ignores_non_tracks(entry):
+    client = MagicMock()
+    client.playlist_items.return_value = {"items": [entry], "next": None}
+    assert asyncio.run(account.SpotifyPlaylistSync("pl", {"album"})._existing_items(client)) == []
+
+
 def test_sync_respects_release_type_filter():
-    import asyncio
     sync = account.SpotifyPlaylistSync("pl", {"album"})
     with patch.object(account, "user_client", side_effect=AssertionError("should not reach Spotify")):
         assert asyncio.run(sync.send_release_notification("A", [{"release_type": "single", "spotify_id": "x"}])) is True

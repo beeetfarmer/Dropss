@@ -280,13 +280,15 @@ class SpotifyPlaylistSync:
 
     async def _existing_items(self, client) -> list[dict]:
         items = []
+        track_fields = "(uri,name,artists(id),album(album_type))"
         page = await asyncio.to_thread(
             client.playlist_items, self.playlist_id, limit=50, additional_types=("track",),
-            fields="items(track(uri,name,artists(id),album(album_type))),next",
+            # "item" replaced "track" for Development Mode apps in Feb 2026; Extended Quota apps still get "track".
+            fields=f"items(item{track_fields},track{track_fields}),next",
         )
         while page:
             for entry in page["items"]:
-                track = entry.get("track") or {}
+                track = entry.get("item") or entry.get("track") or {}
                 if track.get("uri", "").startswith("spotify:track:"):
                     items.append({
                         "uri": track["uri"],
